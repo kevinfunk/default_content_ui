@@ -1,0 +1,30 @@
+default_content_ui.settings:
+  path: '/admin/config/development/default-content'
+  defaults:
+    _title: Default content
+    _controller: '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage'
+  requirements:
+    _is_administrator: 'true'
+
+default_content_ui.import:
+  path: '/admin/config/development/default-content/import'
+  defaults:
+    _form: '\Drupal\default_content_ui\Form\ImportForm'
+    _title: 'Default content - Import'
+  requirements:
+    _permission: 'default content import'
+
+default_content_ui.export:
+  path: '/admin/config/development/default-content/export'
+  defaults:
+    _form: '\Drupal\default_content_ui\Form\ExportForm'
+    _title: 'Default content - Export'
+  requirements:
+    _permission: 'default content export'
+
+default_content_ui.export_download:
+  path: '/admin/config/development/default-content/export/download'
+  defaults:
+    _controller: 'Drupal\default_content_ui\Controller\DownloadController::downloadExport'
+  requirements:
+    _permission: 'default content export'

@@ -1,0 +1,9 @@
+default_content_ui.import:
+  base_route: default_content_ui.settings
+  route_name: default_content_ui.import
+  title: 'Import'
+
+default_content_ui.export:
+  base_route: default_content_ui.settings
+  route_name: default_content_ui.export
+  title: 'Export'

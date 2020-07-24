@@ -1,0 +1,19 @@
+default_content_ui.settings:
+  title: Default content
+  description: Import and export your content.
+  parent: system.admin_config_development
+  route_name: default_content_ui.settings
+
+default_content_ui.import:
+  title: 'Import'
+  description: 'Perform content import.'
+  parent: default_content_ui.settings
+  route_name: default_content_ui.import
+  weight: 1
+
+default_content_ui.export:
+  title: 'Export'
+  description: 'Perform content export.'
+  parent: default_content_ui.settings
+  route_name: default_content_ui.export
+  weight: 2

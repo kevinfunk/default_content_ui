@@ -1,0 +1,22 @@
+<?php
+
+use Drupal\Core\StreamWrapper\StreamWrapperManager;
+
+/**
+ * Implements hook_file_download().
+ */
+function default_content_ui_file_download($uri) {
+  $scheme = StreamWrapperManager::getScheme($uri);
+  $target = StreamWrapperManager::getTarget($uri);
+  if ($scheme == 'temporary' && $target == 'default_content.tar.gz') {
+    $request = \Drupal::request();
+    $date = DateTime::createFromFormat('U', $request->server->get('REQUEST_TIME'));
+    $date_string = $date->format('Y-m-d-H-i');
+    $hostname = str_replace('.', '-', $request->getHttpHost());
+    $filename = 'default_content' . '-' . $hostname . '-' . $date_string . '.tar.gz';
+    $disposition = 'attachment; filename="' . $filename . '"';
+    return [
+      'Content-disposition' => $disposition,
+    ];
+  }
+}
