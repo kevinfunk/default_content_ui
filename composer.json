@@ -1,0 +1,17 @@
+{
+    "name": "kevinfunk/default_content_ui",
+    "description": "Provides a Default content user interface for importing and exporting content.",
+    "type": "drupal-module",
+    "license": "GPL-2.0-or-later",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "authors": [
+        {
+            "name": "Kevin Funk",
+            "email": "kevin@kevinfunk.com"
+        }
+    ],
+    "require": {
+        "drupal/default_content": "2.0.0-alpha1"
+    }
+}
