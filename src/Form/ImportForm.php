@@ -140,7 +140,6 @@ class ImportForm extends FormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $settings = $this->configFactory()->getEditable('default_content_ui.settings');
     $file_system = \Drupal::service('file_system');
-    $module = 'default_content';
     $importer = \Drupal::service('default_content.importer');
 
     if ($path = $form_state->getValue('tarball')) {
@@ -153,7 +152,7 @@ class ImportForm extends FormBase {
         $temp_folder = $file_system->getTempDirectory();
         $archiver->extractList($files, $temp_folder, '', FALSE, FALSE);
         $folder = $temp_folder . '/default_content';
-        $importer->importContent($module, $folder);
+        $importer->importContent($folder);
         $file_system = \Drupal::service('file_system');
         $file_system->deleteRecursive($folder . '/default_content');
       }
@@ -164,7 +163,7 @@ class ImportForm extends FormBase {
     else {
       $folder = $form_state->getValue('folder');
       $settings->set('folder', $folder)->save();
-      $importer->importContent($module, $folder);
+      $importer->importContent($folder);
     }
 
     \Drupal::messenger()->addMessage(t('Content has been imported.'));
