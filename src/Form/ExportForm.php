@@ -192,9 +192,10 @@ class ExportForm extends FormBase {
     $folder = $form_state->getValue('folder');
     $settings->set('folder', $folder)->save();
     $trigger = $form_state->getTriggeringElement();
-
+    $mode = 'entity';
+    
     if ($form_state->getValue('references')) {
-      $mode = 'references';
+          $mode = 'references';
     }
 
     if ($trigger['#name'] == 'export') {
