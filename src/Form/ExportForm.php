@@ -166,12 +166,12 @@ class ExportForm extends FormBase {
       '#type' => 'submit',
       '#value' => $this->t('Save Configuration'),
       '#button_type' => 'primary',
-      '#name' => 'save'
+      '#name' => 'save',
     ];
     $form['actions']['export'] = [
       '#type' => 'submit',
       '#value' => $this->t('Export Content'),
-      '#name' => 'export'
+      '#name' => 'export',
     ];
 
     return $form;
@@ -193,9 +193,9 @@ class ExportForm extends FormBase {
     $settings->set('folder', $folder)->save();
     $trigger = $form_state->getTriggeringElement();
     $mode = 'entity';
-    
+
     if ($form_state->getValue('references')) {
-          $mode = 'references';
+      $mode = 'references';
     }
 
     if ($trigger['#name'] == 'export') {
@@ -217,7 +217,7 @@ class ExportForm extends FormBase {
         if (\Drupal::entityQuery($entity_type)->execute() && $checked) {
           $batch['operations'][] = [
             'Drupal\default_content_ui\Form\ExportForm::batchExport', [
-              $entity_type, $folder, $mode
+              $entity_type, $folder, $mode,
             ]
           ];
         }
@@ -226,7 +226,7 @@ class ExportForm extends FormBase {
       if ($form_state->getValue('download')) {
         $batch['operations'][] = [
           'Drupal\default_content_ui\Form\ExportForm::batchExportTar', [
-            $folder
+            $folder,
           ]
         ];
       }
@@ -236,6 +236,9 @@ class ExportForm extends FormBase {
     }
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public static function batchStart(&$context) {
     $context['results']['entity_types'] = [];
   }
@@ -255,8 +258,10 @@ class ExportForm extends FormBase {
     }
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public static function batchExportTar($folder) {
-    $exporter = \Drupal::service('default_content.exporter');
     $file_system = \Drupal::service('file_system');
     try {
       $file_system->delete($folder . '.tar.gz');
@@ -266,7 +271,7 @@ class ExportForm extends FormBase {
     }
 
     // Create new tarball.
-    $archiver = new ArchiveTar($folder. '.tar.gz', 'gz');
+    $archiver = new ArchiveTar($folder . '.tar.gz', 'gz');
     $archiver->addModify($folder, basename($folder), $folder);
 
     // Try to delete our export.
@@ -281,13 +286,16 @@ class ExportForm extends FormBase {
     \Drupal::messenger()->addMessage($download_link);
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public static function batchFinished($success, $results, $operations) {
     if ($success) {
       if ($results['entity_types']) {
         foreach ($results['entity_types'] as $entity_type) {
           \Drupal::messenger()
             ->addMessage(t('@entity_type has been exported.', [
-              '@entity_type' => $entity_type
+              '@entity_type' => $entity_type,
             ]));
         }
       }
@@ -301,4 +309,5 @@ class ExportForm extends FormBase {
         ]);
     }
   }
+
 }
