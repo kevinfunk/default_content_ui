@@ -154,7 +154,7 @@ class ImportForm extends FormBase {
         $folder = $temp_folder . '/default_content';
         $importer->importContent($folder);
         $file_system = \Drupal::service('file_system');
-        $file_system->deleteRecursive($folder . '/default_content');
+        $file_system->deleteRecursive($folder);
       }
       catch (\Exception $e) {
       }
