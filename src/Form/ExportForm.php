@@ -139,7 +139,7 @@ class ExportForm extends FormBase {
       '#type' => 'checkbox',
       '#title' => $this->t('Export with references'),
       '#description' => $this->t('Export entity type and referenced entity types. (This can add additional entity types that are not checked.)'),
-      '#default_value' => FALSE,
+      '#default_value' => TRUE,
     ];
 
     $form['export']['download'] = [
