@@ -4,7 +4,9 @@ default_content_ui.settings:
     _title: Default content
     _controller: '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage'
   requirements:
-    _is_administrator: 'true'
+    _permission: 'administer site configuration'
+  options:
+    _admin_route: TRUE
 
 default_content_ui.import:
   path: '/admin/config/development/default-content/import'
