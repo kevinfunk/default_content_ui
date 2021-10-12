@@ -21,7 +21,6 @@
         "patches": {
             "drupal/default_content": {
                 "Handle exceptions during import | http://drupal.org/node/3057880": "https://www.drupal.org/files/issues/2020-08-18/3057880-13.patch",
-                "Do not reimport existing entities | http://drupal.org/node/2698425": "https://www.drupal.org/files/issues/2020-09-02/default_content-integrity_constrait_violation-3162987-2.patch",
                 "Decouple Importer | http://drupal.org/node/2951076": "https://www.drupal.org/files/issues/2021-07-17/default_content-decouple-importer-2951076-12.patch",
                 "Add exportContentByType" : "https://www.drupal.org/files/issues/2021-07-17/default_content-add-exportcontentbytype.patch"
             }
