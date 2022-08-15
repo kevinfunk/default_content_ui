@@ -21,9 +21,9 @@
         "patches": {
             "drupal/default_content": {
                 "2786479 - Drush comand to export all items from entity with defined criteria":
-                "https://patches.kevinfunk.com/default_content/default_content-2824103-11.patch",
+                "https://raw.githubusercontent.com/kevinfunk/default_content_ui/2.x-alpha2/patches/default_content-2824103-11.patch",
                 "2951076 - Decouple Importer":
-                "https://patches.kevinfunk.com/default_content/default_content-decouple-importer-2951076-13.patch"
+                "https://raw.githubusercontent.com/kevinfunk/default_content_ui/2.x-alpha2/patches/default_content-decouple-importer-2951076-13.patch"
             }
         }
     }
