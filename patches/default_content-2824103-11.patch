@@ -1,0 +1,284 @@
+diff --git a/drush/default_content.drush.inc b/drush/default_content.drush.inc
+index 99ee4fd..c17122a 100644
+--- a/drush/default_content.drush.inc
++++ b/drush/default_content.drush.inc
+@@ -16,10 +16,10 @@ function default_content_drush_command() {
+       'entity_id' => dt('The ID of the entity to export.'),
+     ],
+     'options' => [
+-      'file' => dt('Write out the exported content to a file instead of stdout'),
++      'folder' => dt('Folder to export to, entities are grouped by entity type into directories.'),
+     ],
+     'aliases' => ['dce'],
+-    'required-arguments' => 2,
++    'required-arguments' => 1,
+   ];
+   $items['default-content-export-references'] = [
+     'description' => dt('Exports an entity and all its referenced entities.'),
+@@ -46,20 +46,27 @@ function default_content_drush_command() {
+ }
+ 
+ /**
+- * Exports a piece of content into the stdout or into a file.
++ * Exports a piece of content.
+  *
+  * @param string $entity_type_id
+  *   The entity type ID.
+  * @param mixed $entity_id
+- *   The entity ID to export.
++ *   (Optional) The entity ID to export or all entities will be exported.
+  */
+-function drush_default_content_export($entity_type_id, $entity_id) {
++function drush_default_content_export($entity_type_id, $entity_id = NULL) {
+   /** @var \Drupal\default_content\ExporterInterface $exporter */
+   $exporter = \Drupal::service('default_content.exporter');
+-  $export = $exporter->exportContent($entity_type_id, $entity_id, drush_get_option('file'));
+ 
+-  if (!drush_get_option('file')) {
+-    drush_print($export);
++  $folder = drush_get_option('folder', '.');
++  if (is_null($entity_id)) {
++    $entities = \Drupal::entityQuery($entity_type_id)->execute();
++  }
++  else {
++    $entities = [$entity_id];
++  }
++  // @todo Add paging.
++  foreach ($entities as $entity_id) {
++    $exporter->exportContent($entity_type_id, $entity_id, $references = FALSE, $folder);
+   }
+ }
+ 
+@@ -84,7 +91,7 @@ function drush_default_content_export_references($entity_type_id, $entity_id = N
+   }
+   // @todo Add paging.
+   foreach ($entities as $entity_id) {
+-    $exporter->exportContentWithReferences($entity_type_id, $entity_id, $folder);
++    $exporter->exportContent($entity_type_id, $entity_id, $references = TRUE, $folder);
+   }
+ }
+ 
+diff --git a/src/Commands/DefaultContentCommands.php b/src/Commands/DefaultContentCommands.php
+index d9c6da4..c5ca0c7 100644
+--- a/src/Commands/DefaultContentCommands.php
++++ b/src/Commands/DefaultContentCommands.php
+@@ -38,14 +38,24 @@ class DefaultContentCommands extends DrushCommands {
+    *   The ID of the entity to export.
+    *
+    * @command default-content:export
+-   * @option file Write out the exported content to a file (must end with .yml) instead of stdout.
++   * @option folder Folder to export to, entities are grouped by entity type into directories.
+    * @aliases dce
+    */
+-  public function contentExport($entity_type_id, $entity_id, $options = ['file' => NULL]) {
+-    $export = $this->defaultContentExporter->exportContent($entity_type_id, $entity_id, $options['file']);
++  public function contentExport($entity_type_id, $entity_id = NULL, $options = ['folder' => NULL]) {
++    $folder = $options['folder'];
++    if (is_null($folder)) {
++      $folder = $this->getConfig()->cwd();
++    }
+ 
+-    if (!$options['file']) {
+-      $this->output()->write($export);
++    if (is_null($entity_id)) {
++      $entities = \Drupal::entityQuery($entity_type_id)->accessCheck(FALSE)->execute();
++    }
++    else {
++      $entities = [$entity_id];
++    }
++    // @todo Add paging.
++    foreach ($entities as $entity_id) {
++      $this->defaultContentExporter->exportContent($entity_type_id, $entity_id, $references = FALSE, $folder);
+     }
+   }
+ 
+@@ -71,7 +81,7 @@ class DefaultContentCommands extends DrushCommands {
+     }
+     // @todo Add paging.
+     foreach ($entities as $entity_id) {
+-      $this->defaultContentExporter->exportContentWithReferences($entity_type_id, $entity_id, $folder);
++      $this->defaultContentExporter->exportContent($entity_type_id, $entity_id, $references = TRUE, $folder);
+     }
+   }
+ 
+diff --git a/src/Exporter.php b/src/Exporter.php
+index 6237457..cbf8bb7 100644
+--- a/src/Exporter.php
++++ b/src/Exporter.php
+@@ -101,7 +101,7 @@ class Exporter implements ExporterInterface {
+   /**
+    * {@inheritdoc}
+    */
+-  public function exportContent($entity_type_id, $entity_id, $destination = NULL) {
++  public function exportContent($entity_type_id, $entity_id, $references = FALSE, $folder = NULL) {
+     $storage = $this->entityTypeManager->getStorage($entity_type_id);
+     $entity = $storage->load($entity_id);
+ 
+@@ -112,33 +112,12 @@ class Exporter implements ExporterInterface {
+       throw new \InvalidArgumentException(sprintf('Entity "%s" with ID "%s" is not a content entity', $entity_type_id, $entity_id));
+     }
+ 
+-    $normalized = $this->contentEntityNormalizer->normalize($entity);
+-    $return = Yaml::encode($normalized);
+-    if ($destination) {
+-      $folder = dirname(dirname($destination));
+-      $this->contentFileStorage->writeEntity($folder, $return, $entity, basename($destination));
+-    }
+-    $this->eventDispatcher->dispatch(new ExportEvent($entity), DefaultContentEvents::EXPORT);
+-
+-    return $return;
+-  }
+-
+-  /**
+-   * {@inheritdoc}
+-   */
+-  public function exportContentWithReferences($entity_type_id, $entity_id, $folder = NULL) {
+-    $storage = $this->entityTypeManager->getStorage($entity_type_id);
+-    $entity = $storage->load($entity_id);
++    $entities = [$entity->uuid() => $entity];
+ 
+-    if (!$entity) {
+-      throw new \InvalidArgumentException(sprintf('Entity "%s" with ID "%s" does not exist', $entity_type_id, $entity_id));
+-    }
+-    if (!($entity instanceof ContentEntityInterface)) {
+-      throw new \InvalidArgumentException(sprintf('Entity "%s" with ID "%s" is not a content entity', $entity_type_id, $entity_id));
++    if ($references) {
++      $entities = $this->getEntityReferencesRecursive($entity, 0, $entities);
+     }
+ 
+-    $entities = [$entity->uuid() => $entity];
+-    $entities = $this->getEntityReferencesRecursive($entity, 0, $entities);
+     // Serialize all entities and key them by entity TYPE and uuid.
+     $serialized_entities_per_type = [];
+     foreach ($entities as $entity) {
+@@ -150,13 +129,12 @@ class Exporter implements ExporterInterface {
+         $this->contentFileStorage->writeEntity($folder, $encoded, $entity);
+       }
+     }
++    $this->eventDispatcher->dispatch(new ExportEvent($entity), DefaultContentEvents::EXPORT);
+ 
+     return $serialized_entities_per_type;
+   }
+ 
+-  /**
+-   * {@inheritdoc}
+-   */
++
+   public function exportModuleContent($module_name, $folder = NULL) {
+     $info_file = $this->moduleHandler->getModule($module_name)->getPathname();
+     $info = $this->infoParser->parse($info_file);
+@@ -170,16 +148,19 @@ class Exporter implements ExporterInterface {
+         if (!$entity) {
+           throw new \InvalidArgumentException(sprintf('Entity "%s" with UUID "%s" does not exist', $entity_type, $uuid));
+         }
+-        $exported_content[$entity_type][$uuid] = $this->exportContent($entity_type, $entity->id());
++        $exported_content = $this->exportContent($entity_type, $entity->id());
++        $encoded = Yaml::encode($exported_content[$entity_type][$uuid]);
+ 
+         if ($folder) {
+-          $this->contentFileStorage->writeEntity($folder, $exported_content[$entity_type][$uuid], $entity);
++          $this->contentFileStorage->writeEntity($folder, $encoded, $entity);
+         }
+       }
+     }
+     return $exported_content;
+   }
+ 
++
++
+   /**
+    * Returns all referenced entities of an entity.
+    *
+@@ -233,5 +214,4 @@ class Exporter implements ExporterInterface {
+ 
+     return $indexed_dependencies;
+   }
+-
+ }
+diff --git a/src/ExporterInterface.php b/src/ExporterInterface.php
+index 03e4ce4..1e32530 100644
+--- a/src/ExporterInterface.php
++++ b/src/ExporterInterface.php
+@@ -14,22 +14,8 @@ interface ExporterInterface {
+    *   The entity type ID.
+    * @param mixed $entity_id
+    *   The entity ID to export.
+-   * @param string|null $destination
+-   *   (optional) A file name to write the exported entity into. File entities
+-   *   also export their files into the same folder.
+-   *
+-   * @return string
+-   *   The rendered export.
+-   */
+-  public function exportContent($entity_type_id, $entity_id, $destination = NULL);
+-
+-  /**
+-   * Exports a single entity and all its referenced entity.
+-   *
+-   * @param string $entity_type_id
+-   *   The entity type ID.
+-   * @param mixed $entity_id
+-   *   The entity ID to export.
++   * @param bool|false $references
++   *   Should references be exported.
+    * @param string|null $folder
+    *   (optional) A folder to write the exported entities into, grouped by
+    *   entity type. File entities also export their files into the same folder.
+@@ -37,7 +23,7 @@ interface ExporterInterface {
+    * @return string[][]
+    *   The serialized entities keyed by entity type and UUID.
+    */
+-  public function exportContentWithReferences($entity_type_id, $entity_id, $folder = NULL);
++  public function exportContent($entity_type_id, $entity_id, $references, $folder = NULL);
+ 
+   /**
+    * Exports all of the content defined in a module's info file.
+diff --git a/tests/src/Kernel/ExporterIntegrationTest.php b/tests/src/Kernel/ExporterIntegrationTest.php
+index 405fab4..5fcae91 100644
+--- a/tests/src/Kernel/ExporterIntegrationTest.php
++++ b/tests/src/Kernel/ExporterIntegrationTest.php
+@@ -72,7 +72,7 @@ class ExporterIntegrationTest extends KernelTestBase {
+     $term = Term::load($term->id());
+ 
+     $exported = $this->exporter->exportContent('taxonomy_term', $term->id());
+-    $exported_decoded = Yaml::decode($exported);
++    $exported_decoded = Yaml::decode($exported['taxonomy_term'][$term->uuid()]);
+ 
+     // Assert the meta data and field values.
+     $meta = [
+@@ -101,7 +101,7 @@ class ExporterIntegrationTest extends KernelTestBase {
+     $child_term->save();
+     // Make sure parent relation is exported.
+     $exported = $this->exporter->exportContent('taxonomy_term', $child_term->id());
+-    $exported_decoded = Yaml::decode($exported);
++    $exported_decoded = Yaml::decode($exported['taxonomy_term'][$child_term->uuid()]);
+     $this->assertEquals($term->uuid(), $exported_decoded['default']['parent'][0]['entity']);
+     $this->assertEquals('taxonomy_term', $exported_decoded['_meta']['depends'][$term->uuid()]);
+   }
+@@ -135,7 +135,7 @@ class ExporterIntegrationTest extends KernelTestBase {
+     // Reload the node to get the proper casted values from the DB.
+     $node = Node::load($node->id());
+ 
+-    $exported_by_entity_type = $this->exporter->exportContentWithReferences('node', $node->id());
++    $exported_by_entity_type = $this->exporter->exportContent('node', $node->id(), $references = TRUE);
+ 
+     // Ensure that the node type is not tryed to be exported.
+     $this->assertEquals(array_keys($exported_by_entity_type), ['node', 'user']);
+@@ -191,7 +191,7 @@ class ExporterIntegrationTest extends KernelTestBase {
+     // Loop reference.
+     $node1->{$field_name}->target_id = $node3->id();
+     $node1->save();
+-    $exported_by_entity_type = $this->exporter->exportContentWithReferences('node', $node3->id());
++    $exported_by_entity_type = $this->exporter->exportContent('node', $node3->id(), $references = TRUE);
+     // Ensure all 3 nodes are exported.
+     $this->assertEquals(3, count($exported_by_entity_type['node']));
+   }
+@@ -321,7 +321,7 @@ class ExporterIntegrationTest extends KernelTestBase {
+     $file->save();
+ 
+     $folder = 'temporary://default_content';
+-    $exported_by_entity_type = $this->exporter->exportContentWithReferences('file', $file->id(), $folder);
++    $exported_by_entity_type = $this->exporter->exportContent('file', $file->id(), $references = TRUE, $folder);
+     $normalized_file = Yaml::decode($exported_by_entity_type['file'][$file->uuid()]);
+ 
+     $expected = [

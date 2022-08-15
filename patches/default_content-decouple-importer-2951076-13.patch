@@ -1,0 +1,56 @@
+diff --git a/src/Importer.php b/src/Importer.php
+index 27fedaf..a30d2c2 100644
+--- a/src/Importer.php
++++ b/src/Importer.php
+@@ -149,9 +149,17 @@ class Importer implements ImporterInterface {
+   /**
+    * {@inheritdoc}
+    */
+-  public function importContent($module) {
++  public function importContent($source) {
+     $created = [];
+-    $folder = \Drupal::service('extension.list.module')->getPath($module) . "/content";
++    $isModuleImport = \Drupal::moduleHandler()->moduleExists($source);
++
++    if ($isModuleImport) {
++      $module = $source;
++      $folder = drupal_get_path('module', $module) . "/content";
++    }
++    else {
++      $folder = $source;
++    }
+ 
+     if (file_exists($folder)) {
+       $root_user = $this->entityTypeManager->getStorage('user')->load(1);
+@@ -277,7 +285,7 @@ class Importer implements ImporterInterface {
+           $created[$entity->uuid()] = $entity;
+         }
+       }
+-      $this->eventDispatcher->dispatch(new ImportEvent($created, $module), DefaultContentEvents::IMPORT);
++      $this->eventDispatcher->dispatch(new ImportEvent($created, $source), DefaultContentEvents::IMPORT);
+       $this->accountSwitcher->switchBack();
+     }
+     // Reset the tree.
+diff --git a/src/ImporterInterface.php b/src/ImporterInterface.php
+index 0d300a3..190ad37 100644
+--- a/src/ImporterInterface.php
++++ b/src/ImporterInterface.php
+@@ -8,14 +8,14 @@ namespace Drupal\default_content;
+ interface ImporterInterface {
+ 
+   /**
+-   * Imports default content from a given module.
++   * Imports default content from a given source.
+    *
+-   * @param string $module
+-   *   The module to create the default content from.
++   * @param string $source
++   *   The module or folder path to create the default content from.
+    *
+    * @return \Drupal\Core\Entity\EntityInterface[]
+    *   An array of created entities keyed by their UUIDs.
+    */
+-  public function importContent($module);
++  public function importContent($source);
+ 
+ }
