@@ -1,5 +1,5 @@
 diff --git a/src/Importer.php b/src/Importer.php
-index 27fedaf..a30d2c2 100644
+index 27fedaf..03bb13d 100644
 --- a/src/Importer.php
 +++ b/src/Importer.php
 @@ -149,9 +149,17 @@ class Importer implements ImporterInterface {
@@ -14,7 +14,7 @@ index 27fedaf..a30d2c2 100644
 +
 +    if ($isModuleImport) {
 +      $module = $source;
-+      $folder = drupal_get_path('module', $module) . "/content";
++      $folder = \Drupal::service('extension.path.resolver')->getPath('module', $module) . "/content";
 +    }
 +    else {
 +      $folder = $source;
