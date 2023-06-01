@@ -214,7 +214,7 @@ class ExportForm extends FormBase {
       }
 
       foreach ($form_state->getValue('entity_types') as $entity_type => $checked) {
-        if (\Drupal::entityQuery($entity_type)->execute() && $checked) {
+        if (\Drupal::entityQuery($entity_type)->accessCheck(TRUE)->execute() && $checked) {
           $batch['operations'][] = [
             'Drupal\default_content_ui\Form\ExportForm::batchExport', [
               $entity_type, $folder, $mode,
@@ -246,7 +246,7 @@ class ExportForm extends FormBase {
   public static function batchExport($entity_type, $folder, $mode, &$context) {
     $context['results']['entity_types'][] = $entity_type;
     $exporter = \Drupal::service('default_content.exporter');
-    $entities = \Drupal::entityQuery($entity_type)->execute();
+    $entities = \Drupal::entityQuery($entity_type)->accessCheck(TRUE)->execute();
     foreach ($entities as $entity_id) {
       if ($mode === 'references') {
         $exporter->exportContent($entity_type, $entity_id, $references = true, $folder);
