@@ -1,15 +1,15 @@
 diff --git a/src/Importer.php b/src/Importer.php
-index 27fedaf..03bb13d 100644
+index 7115d7a..2437ec4 100644
 --- a/src/Importer.php
 +++ b/src/Importer.php
-@@ -149,9 +149,17 @@ class Importer implements ImporterInterface {
+@@ -179,9 +179,17 @@ class Importer implements ImporterInterface {
    /**
     * {@inheritdoc}
     */
 -  public function importContent($module) {
 +  public function importContent($source) {
      $created = [];
--    $folder = \Drupal::service('extension.list.module')->getPath($module) . "/content";
+-    $folder = $this->extensionList->getPath($module) . "/content";
 +    $isModuleImport = \Drupal::moduleHandler()->moduleExists($source);
 +
 +    if ($isModuleImport) {
@@ -22,7 +22,7 @@ index 27fedaf..03bb13d 100644
  
      if (file_exists($folder)) {
        $root_user = $this->entityTypeManager->getStorage('user')->load(1);
-@@ -277,7 +285,7 @@ class Importer implements ImporterInterface {
+@@ -312,7 +320,7 @@ class Importer implements ImporterInterface {
            $created[$entity->uuid()] = $entity;
          }
        }

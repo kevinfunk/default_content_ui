@@ -13,17 +13,17 @@
     ],
     "require": {
         "cweagans/composer-patches": "^1.6.0",
-        "drupal/default_content": "2.0.0-alpha2"
+        "drupal/default_content": "2.0.0-alpha3"
     },
     "extra": {
         "composer-exit-on-patch-failure": true,
         "enable-patching": true,
         "patches": {
             "drupal/default_content": {
-                "2786479 - Drush comand to export all items from entity with defined criteria":
-                "https://raw.githubusercontent.com/kevinfunk/default_content_ui/2.x-alpha2/patches/default_content-2824103-11.patch",
+                "2824103 - default-content-export-references behaves differently than default-content-export":
+                "https://raw.githubusercontent.com/kevinfunk/default_content_ui/2.x-alpha3/patches/default_content-2824103-11.patch",
                 "2951076 - Decouple Importer":
-                "https://raw.githubusercontent.com/kevinfunk/default_content_ui/2.x-alpha2/patches/default_content-decouple-importer-2951076-13.patch"
+                "https://raw.githubusercontent.com/kevinfunk/default_content_ui/2.x-alpha3/patches/default_content-decouple-importer-2951076-13.patch"
             }
         }
     }
