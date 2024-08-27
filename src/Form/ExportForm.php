@@ -249,10 +249,10 @@ class ExportForm extends FormBase {
     $entities = \Drupal::entityQuery($entity_type)->accessCheck(TRUE)->execute();
     foreach ($entities as $entity_id) {
       if ($mode === 'references') {
-        $exporter->exportContent($entity_type, $entity_id, $references = true, $folder);
+        $exporter->exportContentWithReferences($entity_type, $entity_id, $folder);
       }
       else {
-        $exporter->exportContent($entity_type, $entity_id, $references = false, $folder);
+        $exporter->exportContent($entity_type, $entity_id, $folder);
       }
 
     }
