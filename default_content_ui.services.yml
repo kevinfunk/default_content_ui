@@ -1,0 +1,14 @@
+services:
+  default_content_ui.route_subscriber:
+    class: Drupal\default_content_ui\Routing\ExportEntityRouteSubscriber
+    arguments: ['@entity_type.manager']
+    tags:
+      - { name: event_subscriber }
+
+  default_content_ui.hooks:
+    class: Drupal\default_content_ui\Hook\DefaultContentUiHooks
+    arguments:
+      - '@stream_wrapper_manager'
+      - '@current_user'
+      - '@config.factory'
+      - '@request_stack'

@@ -1,7 +1,10 @@
-name: 'Default content UI'
+name: 'Default Content UI'
 type: module
 description: 'Provides a user interface for importing and exporting content.'
 package: Web services
-core_version_requirement: '>=9.1'
+core_version_requirement: ^11.3
 dependencies:
-  - default_content:default_content
+  - drupal:file
+  - drupal:system
+  - drupal:user
+  - drupal:serialization

@@ -1,19 +1,26 @@
-default_content_ui.settings:
-  title: Default content
-  description: Import and export your content.
+default_content_ui.admin:
+  title: 'Default Content'
+  description: 'Import, export, and configure Default Content UI.'
   parent: system.admin_config_development
-  route_name: default_content_ui.settings
-
-default_content_ui.import:
-  title: 'Import'
-  description: 'Perform content import.'
-  parent: default_content_ui.settings
-  route_name: default_content_ui.import
-  weight: 1
+  route_name: default_content_ui.admin
 
 default_content_ui.export:
   title: 'Export'
-  description: 'Perform content export.'
-  parent: default_content_ui.settings
-  route_name: default_content_ui.export
-  weight: 2
+  description: 'Export multiple entity types and dependencies to an archive.'
+  parent: default_content_ui.admin
+  route_name: default_content_ui.export_bulk
+  weight: 10
+
+default_content_ui.import:
+  title: 'Import'
+  description: 'Import content from an uploaded archive.'
+  parent: default_content_ui.admin
+  route_name: default_content_ui.import
+  weight: 20
+
+default_content_ui.settings:
+  title: 'Settings'
+  description: 'Configure the Default Content UI settings.'
+  parent: default_content_ui.admin
+  route_name: default_content_ui.settings
+  weight: 30

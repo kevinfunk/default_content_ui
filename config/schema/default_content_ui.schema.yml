@@ -1,14 +1,22 @@
 default_content_ui.settings:
   type: config_object
-  label: 'Default content UI Settings'
+  label: 'Default Content UI Settings'
   mapping:
-    folder:
-      type: string
-      label: 'Export folder'
-    safe:
+    bulk_export_types:
       type: sequence
-      label: 'Export List'
+      label: 'Bulk Export Types'
       sequence:
         type: string
         label: 'Entity Type'
-
+    local_export_types:
+      type: sequence
+      label: 'Local Export Types'
+      sequence:
+        type: string
+        label: 'Entity Type'
+    bulk_export_reference_mode:
+      type: boolean
+      label: 'Bulk Export: Include Dependencies'
+    local_export_reference_mode:
+      type: boolean
+      label: 'Local Export: Include Dependencies'

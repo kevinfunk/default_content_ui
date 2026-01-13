@@ -1,56 +1,31 @@
 <?php
 
-/**
- * @file
- * Contains \Drupal\default_content_ui\Form\ImportForm.
- */
 namespace Drupal\default_content_ui\Form;
 
-use Drupal\Core\Archiver\ArchiveTar;
-use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Entity\EntityTypeBundleInfoInterface;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\default_content_ui\Batch\ImportBatch;
+use Drupal\file\Entity\File;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\Core\Extension\ModuleHandler;
 
 /**
- * Implements the Default content import form.
+ * Implements the Import form.
  */
 class ImportForm extends FormBase {
 
   /**
-   * Drupal\Core\Extension\ModuleHandler definition.
+   * The file system service.
    *
-   * @var \Drupal\Core\Extension\ModuleHandler
+   * @var \Drupal\Core\File\FileSystemInterface
    */
-  protected $moduleHandler;
+  protected FileSystemInterface $fileSystem;
 
   /**
-   * Drupal\Core\Entity\EntityTypeManagerInterface.
-   *
-   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   * ImportForm constructor.
    */
-  protected $entityTypeManager;
-
-  /**
-   * Drupal\Core\Entity\EntityTypeBundleInfoInterface
-   *
-   * @var \Drupal\Core\Entity\EntityTypeBundleInfoInterface
-   */
-  protected $entityBundleInfo;
-
-  /**
-   * ExampleForm constructor.
-   *
-   * @var \Drupal\Core\Extension\ModuleHandler
-   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
-   * @var \Drupal\Core\Entity\EntityTypeBundleInfoInterface
-   */
-  public function __construct(ModuleHandler $module_handler, EntityTypeManagerInterface $entity_type_manager, EntityTypeBundleInfoInterface $entity_bundle_info) {
-    $this->moduleHandler = $module_handler;
-    $this->entityTypeManager = $entity_type_manager;
-    $this->entityBundleInfo = $entity_bundle_info;
+  public function __construct(FileSystemInterface $file_system) {
+    $this->fileSystem = $file_system;
   }
 
   /**
@@ -58,14 +33,12 @@ class ImportForm extends FormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('module_handler'),
-      $container->get('entity_type.manager'),
-      $container->get('entity_type.bundle.info')
+      $container->get('file_system')
     );
   }
 
   /**
-   * {@inheritdoc}.
+   * {@inheritdoc}
    */
   public function getFormId() {
     return 'default_content_ui_import_form';
@@ -75,43 +48,22 @@ class ImportForm extends FormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-
-    $form['import']['location'] = [
-      '#type' => 'radios',
-      '#title' => $this->t('Import location'),
-      //'#default_value' => 'tarball',
-      '#options' => [
-        'tarball' => $this->t('Upload tar file'),
-        'folder' => $this->t('Folder on server'),
+    $form['archive'] = [
+      '#type' => 'managed_file',
+      '#title' => $this->t('Upload ZIP Archive'),
+      '#description' => $this->t('<strong>Format:</strong> .zip<br><strong>Structure:</strong> The archive must contain folders named by entity type (e.g., <em>node</em>, <em>taxonomy_term</em>) containing YAML files.'),
+      '#upload_validators' => [
+        'FileExtension' => ['extensions' => 'zip'],
       ],
+      '#upload_location' => 'temporary://',
+      '#required' => TRUE,
     ];
 
-    $form['import']['tarball'] = [
-      '#type' => 'file',
-      '#title' => $this->t('Import from a tar file.'),
-      '#description' => $this->t('This will not update existing content in a content directory.'),
-      '#states' => [
-        'visible' => [
-          ':input[name="location"]' => ['value' => 'tarball'],
-        ],
-      ],
-    ];
-
-    $form['import']['folder'] = [
-      '#type' => 'textfield',
-      '#title' => $this->t('Folder'),
-      '#description' => $this->t('Folder for content to be imported from. Example (sites/default/files/default_content)'),
-      '#default_value' => $this->config('default_content_ui.settings')->get('folder'),
-      '#states' => [
-        'visible' => [
-          ':input[name="location"]' => ['value' => 'folder'],
-        ],
-      ],
-    ];
-
-    $form['import']['submit'] = [
+    $form['actions'] = ['#type' => 'actions'];
+    $form['actions']['submit'] = [
       '#type' => 'submit',
-      '#value' => $this->t('Import content'),
+      '#value' => $this->t('Import Content'),
+      '#button_type' => 'primary',
     ];
 
     return $form;
@@ -120,54 +72,39 @@ class ImportForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function validateForm(array &$form, FormStateInterface $form_state) {
-    $all_files = $this->getRequest()->files->get('files', []);
-    if (!empty($all_files['tarball'])) {
-      $file_upload = $all_files['tarball'];
-      if ($file_upload->isValid()) {
-        $form_state->setValue('tarball', $file_upload->getRealPath());
-        return;
-      }
-      else {
-        $form_state->setErrorByName('tarball', $this->t('The file could not be uploaded.'));
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    $settings = $this->configFactory()->getEditable('default_content_ui.settings');
-    $file_system = \Drupal::service('file_system');
-    $importer = \Drupal::service('default_content.importer');
-
-    if ($path = $form_state->getValue('tarball')) {
-      try {
-        $archiver = new ArchiveTar($path, 'gz');
-        $files = [];
-        foreach ($archiver->listContent() as $file) {
-          $files[] = $file['filename'];
-        }
-        $temp_folder = $file_system->getTempDirectory();
-        $archiver->extractList($files, $temp_folder, '', FALSE, FALSE);
-        $folder = $temp_folder . '/default_content';
-        $importer->importContent($folder);
-        $file_system = \Drupal::service('file_system');
-        $file_system->deleteRecursive($folder);
-      }
-      catch (\Exception $e) {
-      }
-      $file_system->unlink($path);
-    }
-    else {
-      $folder = $form_state->getValue('folder');
-      $settings->set('folder', $folder)->save();
-      $importer->importContent($folder);
+    $fids = $form_state->getValue('archive');
+    if (empty($fids)) {
+      return;
     }
 
-    \Drupal::messenger()->addMessage(t('Content has been imported.'));
+    $fid = reset($fids);
+    $file = File::load($fid);
+
+    if (!$file) {
+      $this->messenger()->addError($this->t('The file could not be loaded.'));
+      return;
+    }
+
+    $zip_uri = $file->getFileUri();
+    $extract_path = 'temporary://import_extract_' . time();
+
+    $batch = [
+      'title' => $this->t('Importing Content'),
+      'operations' => [
+        [
+          [ImportBatch::class, 'extract'],
+          [$zip_uri, $extract_path, $fid],
+        ],
+        [
+          [ImportBatch::class, 'import'],
+          [$extract_path],
+        ],
+      ],
+      'finished' => [ImportBatch::class, 'finished'],
+    ];
+
+    batch_set($batch);
   }
-
 
 }

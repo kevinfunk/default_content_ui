@@ -1,32 +1,38 @@
-default_content_ui.settings:
+default_content_ui.admin:
   path: '/admin/config/development/default-content'
   defaults:
-    _title: Default content
     _controller: '\Drupal\system\Controller\SystemController::systemAdminMenuBlockPage'
+    _title: 'Default Content'
   requirements:
     _permission: 'administer site configuration'
-  options:
-    _admin_route: TRUE
+
+default_content_ui.settings:
+  path: '/admin/config/development/default-content/settings'
+  defaults:
+    _form: '\Drupal\default_content_ui\Form\SettingsForm'
+    _title: 'Settings'
+  requirements:
+    _permission: 'administer site configuration'
 
 default_content_ui.import:
   path: '/admin/config/development/default-content/import'
   defaults:
     _form: '\Drupal\default_content_ui\Form\ImportForm'
-    _title: 'Default content - Import'
+    _title: 'Import Content'
   requirements:
     _permission: 'default content import'
 
-default_content_ui.export:
+default_content_ui.export_bulk:
   path: '/admin/config/development/default-content/export'
   defaults:
-    _form: '\Drupal\default_content_ui\Form\ExportForm'
-    _title: 'Default content - Export'
+    _form: '\Drupal\default_content_ui\Form\ExportBulkForm'
+    _title: 'Export Content'
   requirements:
     _permission: 'default content export'
 
 default_content_ui.export_download:
   path: '/admin/config/development/default-content/export/download'
   defaults:
-    _controller: 'Drupal\default_content_ui\Controller\DownloadController::downloadExport'
+    _controller: 'Drupal\default_content_ui\Controller\ExportDownloadController::downloadExport'
   requirements:
     _permission: 'default content export'

@@ -4,6 +4,6 @@ default content import:
   restrict access: TRUE
 
 default content export:
-  description: 'Allows user to export content via UI. It will overwrite existing content.'
+  description: 'Allows user to export content via UI.'
   title: 'Export content'
   restrict access: TRUE

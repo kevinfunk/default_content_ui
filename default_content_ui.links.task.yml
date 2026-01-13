@@ -1,9 +1,20 @@
-default_content_ui.import:
-  base_route: default_content_ui.settings
-  route_name: default_content_ui.import
-  title: 'Import'
-
-default_content_ui.export:
-  base_route: default_content_ui.settings
-  route_name: default_content_ui.export
+default_content_ui.export_tab:
+  route_name: default_content_ui.export_bulk
+  base_route: default_content_ui.export_bulk
   title: 'Export'
+  weight: 0
+
+default_content_ui.import_tab:
+  route_name: default_content_ui.import
+  base_route: default_content_ui.export_bulk
+  title: 'Import'
+  weight: 10
+
+default_content_ui.settings_tab:
+  route_name: default_content_ui.settings
+  base_route: default_content_ui.export_bulk
+  title: 'Settings'
+  weight: 20
+
+default_content_ui.entity_export:
+  deriver: Drupal\default_content_ui\Plugin\Derivative\ExportEntityLocalTask
