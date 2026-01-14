@@ -94,11 +94,7 @@ class ExportBatch {
 
     $sys_temp = sys_get_temp_dir();
     $archive_name = basename($folder) . '.zip';
-    $zip_path = $sys_temp . '/' . $archive_name;
-
-    if (file_exists($zip_path)) {
-      @unlink($zip_path);
-    }
+    $zip_path = $file_system->tempnam($sys_temp, 'dcu_export_');
 
     $zip = new \ZipArchive();
     if ($zip->open($zip_path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === TRUE) {
