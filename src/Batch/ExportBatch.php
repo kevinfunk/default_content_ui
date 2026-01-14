@@ -4,6 +4,7 @@ namespace Drupal\default_content_ui\Batch;
 
 use Drupal\Core\DefaultContent\Exporter;
 use Drupal\Core\File\FileSystemInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 
 /**
  * Batch operations for Default Content UI export using Core APIs.
@@ -71,7 +72,13 @@ class ExportBatch {
   /**
    * Callback to export a single entity.
    */
-  public static function exportSingle($entity, $folder, $mode, &$context) {
+  public static function exportSingle($entity_type_id, $id, $folder, $mode, &$context) {
+    $entity = \Drupal::entityTypeManager()->getStorage($entity_type_id)->load($id);
+
+    if (!$entity) {
+      return;
+    }
+
     /** @var \Drupal\Core\DefaultContent\Exporter $exporter */
     $exporter = \Drupal::service(Exporter::class);
 
@@ -116,6 +123,7 @@ class ExportBatch {
       $zip->close();
 
       $destination = 'temporary://' . $archive_name;
+
       $file_system->move($zip_path, $destination, FileSystemInterface::EXISTS_REPLACE);
 
       $context['results']['download_archive'] = $archive_name;
@@ -125,7 +133,6 @@ class ExportBatch {
       $file_system->deleteRecursive($folder);
     }
     catch (\Exception $e) {
-      // Log the error instead of silently ignoring it.
       \Drupal::logger('default_content_ui')->warning('Failed to delete temporary export folder: @message', ['@message' => $e->getMessage()]);
     }
   }
@@ -141,10 +148,10 @@ class ExportBatch {
         $session->set('default_content_ui_download_label', $results['primary_label']);
       }
       $session->save();
-      \Drupal::messenger()->addStatus(t('Export complete.'));
+      \Drupal::messenger()->addStatus(new TranslatableMarkup('Export complete.'));
     }
     else {
-      \Drupal::messenger()->addError(t('Export failed.'));
+      \Drupal::messenger()->addError(new TranslatableMarkup('Export failed.'));
     }
   }
 

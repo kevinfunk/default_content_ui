@@ -64,7 +64,7 @@ class ExportEntityController extends ControllerBase {
 
     $batch['operations'][] = [
       [ExportBatch::class, 'exportSingle'],
-      [$entity, $folder, $mode],
+      [$entity->getEntityTypeId(), $entity->id(), $folder, $mode],
     ];
 
     $batch['operations'][] = [

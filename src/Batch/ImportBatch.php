@@ -5,6 +5,7 @@ namespace Drupal\default_content_ui\Batch;
 use Drupal\Core\DefaultContent\Existing;
 use Drupal\Core\DefaultContent\Finder;
 use Drupal\Core\DefaultContent\Importer;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\file\Entity\File;
 
 /**
@@ -66,6 +67,12 @@ class ImportBatch {
    * Imports content from the extracted folder.
    */
   public static function import($folder, &$context) {
+    if (!is_dir($folder)) {
+      $context['success'] = FALSE;
+      $context['results']['error'] = 'Import directory not found or extraction failed.';
+      return;
+    }
+
     /** @var \Drupal\Core\DefaultContent\Importer $importer */
     $importer = \Drupal::service(Importer::class);
 
@@ -96,10 +103,10 @@ class ImportBatch {
   public static function finished($success, $results, $operations) {
     $file_system = \Drupal::service('file_system');
     if ($success && !empty($results['imported'])) {
-      \Drupal::messenger()->addStatus(t('Content import completed successfully.'));
+      \Drupal::messenger()->addStatus(new TranslatableMarkup('Content import completed successfully.'));
     }
     else {
-      \Drupal::messenger()->addError(t('Import failed: @error', ['@error' => $results['error'] ?? 'Unknown error']));
+      \Drupal::messenger()->addError(new TranslatableMarkup('Import failed: @error', ['@error' => $results['error'] ?? 'Unknown error']));
     }
 
     if (!empty($results['extract_path'])) {
