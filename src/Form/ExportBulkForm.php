@@ -135,16 +135,10 @@ class ExportBulkForm extends ConfigFormBase {
       '#default_value' => $default_values,
     ];
 
-    $form['options'] = [
-      '#title' => $this->t('Options'),
-      '#type' => 'details',
-      '#open' => TRUE,
-    ];
-
-    $form['options']['references'] = [
+    $form['references'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Include dependencies'),
-      '#description' => $this->t('Should referenced entities be exported automatically?'),
+      '#description' => $this->t('Automatically export referenced entities (e.g., taxonomy terms, media) when exporting.'),
       '#default_value' => $config->get('bulk_export_reference_mode') ?? TRUE,
     ];
 

@@ -124,7 +124,7 @@ class SettingsForm extends ConfigFormBase {
     $form['single_export']['references'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Include dependencies'),
-      '#description' => $this->t('Automatically export referenced entities (e.g., taxonomy terms, media) when exporting a single item.'),
+      '#description' => $this->t('Automatically export referenced entities (e.g., taxonomy terms, media) when exporting.'),
       '#default_value' => $config->get('local_export_reference_mode') ?? TRUE,
     ];
 
