@@ -1,0 +1,11 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - taxonomy
+    - default_content_ui
+id: default_content_export_taxonomy_term
+label: 'Export Default Content'
+type: taxonomy_term
+plugin: 'default_content_ui_export_action:taxonomy_term'
+configuration: { }

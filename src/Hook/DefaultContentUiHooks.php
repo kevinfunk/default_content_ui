@@ -3,7 +3,8 @@
 namespace Drupal\default_content_ui\Hook;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Messenger\MessengerTrait;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -49,6 +50,20 @@ class DefaultContentUiHooks {
   protected RequestStack $requestStack;
 
   /**
+   * The file system.
+   *
+   * @var \Drupal\Core\File\FileSystemInterface
+   */
+  protected FileSystemInterface $fileSystem;
+
+  /**
+   * The entity type manager.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
+   */
+  protected EntityTypeManagerInterface $entityTypeManager;
+
+  /**
    * Constructs a new DefaultContentUiHooks object.
    */
   public function __construct(
@@ -56,11 +71,15 @@ class DefaultContentUiHooks {
     AccountProxyInterface $current_user,
     ConfigFactoryInterface $config_factory,
     RequestStack $request_stack,
+    FileSystemInterface $file_system,
+    EntityTypeManagerInterface $entity_type_manager,
   ) {
     $this->streamWrapperManager = $stream_wrapper_manager;
     $this->currentUser = $current_user;
     $this->configFactory = $config_factory;
     $this->requestStack = $request_stack;
+    $this->fileSystem = $file_system;
+    $this->entityTypeManager = $entity_type_manager;
   }
 
   /**
@@ -77,9 +96,7 @@ class DefaultContentUiHooks {
       if (!$this->currentUser->hasPermission('default content export')) {
         return -1;
       }
-
       $filename = basename($target);
-
       return [
         'Content-disposition' => 'attachment; filename="' . $filename . '"',
       ];
@@ -91,25 +108,41 @@ class DefaultContentUiHooks {
    */
   #[Hook('page_attachments')]
   public function pageAttachments(array &$attachments) {
-    $session = $this->requestStack->getCurrentRequest()->getSession();
+    $request = $this->requestStack->getCurrentRequest();
+    if (!$request || !$request->hasSession()) {
+      return;
+    }
+    $session = $request->getSession();
 
     if ($session->has('default_content_ui_download')) {
       $filename = $session->get('default_content_ui_download');
 
       if (empty($filename) || !file_exists('temporary://' . basename($filename))) {
         $session->remove('default_content_ui_download');
+        $session->remove('default_content_ui_download_count');
         $session->remove('default_content_ui_download_label');
         return;
       }
 
+      // Retrieve data passed from ExportBatch::finished.
+      $count = $session->get('default_content_ui_download_count', 0);
       $label = $session->get('default_content_ui_download_label');
-      if ($label) {
+
+      if ($count > 1) {
+        $this->messenger()->addStatus($this->t('The export archive for @count items is downloading automatically.', ['@count' => $count]));
+      }
+      elseif ($label) {
         $this->messenger()->addStatus($this->t('The export archive for %label is downloading automatically.', ['%label' => $label]));
       }
       else {
         $this->messenger()->addStatus($this->t('The export archive is downloading automatically.'));
       }
 
+      // Cleanup session variables.
+      $session->remove('default_content_ui_download_count');
+      $session->remove('default_content_ui_download_label');
+
+      // Add the auto-download meta tag.
       $attachments['#attached']['html_head'][] = [
         [
           '#tag' => 'meta',
@@ -129,10 +162,9 @@ class DefaultContentUiHooks {
    * Implements hook_entity_operation().
    */
   #[Hook('entity_operation')]
-  public function entityOperation(EntityInterface $entity) {
+  public function entityOperation($entity) {
     $operations = [];
     $entity_type = $entity->getEntityType();
-
     $enabled_types = $this->configFactory->get('default_content_ui.settings')->get('local_export_types');
     $is_enabled = is_null($enabled_types) || in_array($entity->getEntityTypeId(), $enabled_types);
 

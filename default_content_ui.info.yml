@@ -5,6 +5,6 @@ package: Web services
 core_version_requirement: ^11.3
 dependencies:
   - drupal:file
+  - drupal:serialization
   - drupal:system
   - drupal:user
-  - drupal:serialization

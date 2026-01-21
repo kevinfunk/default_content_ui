@@ -12,3 +12,5 @@ services:
       - '@current_user'
       - '@config.factory'
       - '@request_stack'
+      - '@file_system'
+      - '@entity_type.manager'

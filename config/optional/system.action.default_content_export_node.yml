@@ -1,0 +1,11 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+    - default_content_ui
+id: default_content_export_node
+label: 'Export Default Content'
+type: node
+plugin: 'default_content_ui_export_action:node'
+configuration: { }

@@ -36,3 +36,11 @@ default_content_ui.export_download:
     _controller: 'Drupal\default_content_ui\Controller\ExportDownloadController::downloadExport'
   requirements:
     _permission: 'default content export'
+
+default_content_ui.export_selection:
+  path: '/admin/config/development/default-content/export/selection'
+  defaults:
+    _form: '\Drupal\default_content_ui\Form\ExportSelectionForm'
+    _title: 'Confirm Export'
+  requirements:
+    _permission: 'default content export'

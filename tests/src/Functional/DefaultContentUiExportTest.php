@@ -4,9 +4,11 @@ namespace Drupal\Tests\default_content_ui\Functional;
 
 use Drupal\field\Entity\FieldConfig;
 use Drupal\field\Entity\FieldStorageConfig;
+use Drupal\system\Entity\Action;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\taxonomy\Entity\Vocabulary;
 use Drupal\Tests\BrowserTestBase;
+use Drupal\views\Entity\View;
 
 /**
  * Tests the Default Content UI export features.
@@ -26,14 +28,15 @@ class DefaultContentUiExportTest extends BrowserTestBase {
    * @var string[]
    */
   protected static $modules = [
-    'default_content_ui',
-    'serialization',
     'node',
     'taxonomy',
     'user',
     'file',
     'system',
     'field',
+    'views',
+    'serialization',
+    'default_content_ui',
   ];
 
   /**
@@ -105,6 +108,22 @@ class DefaultContentUiExportTest extends BrowserTestBase {
       'field_tags' => [$this->term->id()],
     ]);
 
+    // Clear caches to ensure Action Plugins are discovered.
+    $this->container->get('plugin.manager.action')->clearCachedDefinitions();
+
+    // Ensure the Action exists and is Enabled.
+    $action = Action::load('default_content_export_node');
+    if (!$action) {
+      $action = Action::create([
+        'id' => 'default_content_export_node',
+        'label' => 'Export Default Content',
+        'type' => 'node',
+        'plugin' => 'default_content_ui_export_action:node',
+      ]);
+    }
+    $action->set('status', TRUE);
+    $action->save();
+
     $this->adminUser = $this->drupalCreateUser([
       'default content export',
       'default content import',
@@ -113,6 +132,78 @@ class DefaultContentUiExportTest extends BrowserTestBase {
       'bypass node access',
       'access content',
     ]);
+  }
+
+  /**
+   * Test Views Bulk Export Action.
+   */
+  public function testViewsBulkExport() {
+    $view = View::create([
+      'id' => 'test_export_view',
+      'base_table' => 'node_field_data',
+      'label' => 'Test Export View',
+    ]);
+
+    $view->addDisplay('default', 'Master', 'default');
+    $default = &$view->getDisplay('default');
+
+    $default['display_options'] = [
+      'access' => ['type' => 'perm', 'options' => ['perm' => 'access content']],
+      'style' => ['type' => 'table'],
+      'row' => ['type' => 'fields'],
+      'fields' => [
+        'node_bulk_form' => [
+          'id' => 'node_bulk_form',
+          'table' => 'node',
+          'field' => 'node_bulk_form',
+          'plugin_id' => 'bulk_form',
+          'entity_type' => 'node',
+          'include_exclude' => 'include',
+          'selected_actions' => [
+            'default_content_export_node' => 'default_content_export_node',
+          ],
+        ],
+        'title' => [
+          'id' => 'title',
+          'table' => 'node_field_data',
+          'field' => 'title',
+          'plugin_id' => 'field',
+          'entity_type' => 'node',
+        ],
+      ],
+    ];
+
+    $view->addDisplay('page', 'Page', 'page_1');
+    $page = &$view->getDisplay('page_1');
+    $page['display_options']['path'] = 'test-export-view';
+
+    $view->save();
+    \Drupal::service('router.builder')->rebuild();
+
+    $node2 = $this->drupalCreateNode(['type' => 'page', 'title' => 'Page 2']);
+    $node3 = $this->drupalCreateNode(['type' => 'page', 'title' => 'Page 3']);
+
+    $this->drupalLogin($this->adminUser);
+    $this->drupalGet('test-export-view');
+    $this->assertSession()->statusCodeEquals(200);
+
+    // Dynamic Checkbox Selection
+    $checkboxes = $this->getSession()->getPage()->findAll('css', 'input[name^="node_bulk_form"]');
+    $this->assertCount(3, $checkboxes, 'Found 3 checkboxes for the 3 nodes.');
+
+    $edit = ['action' => 'default_content_export_node'];
+    foreach ($checkboxes as $checkbox) {
+      $edit[$checkbox->getAttribute('name')] = TRUE;
+    }
+
+    $this->submitForm($edit, 'Apply to selected items');
+
+    $expected = [
+      'node/' . $this->node->uuid() . '.yml',
+      'node/' . $node2->uuid() . '.yml',
+      'node/' . $node3->uuid() . '.yml',
+    ];
+    $this->verifyExportArchiveOnDisk($expected);
   }
 
   /**
@@ -198,6 +289,7 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $unexpected = [
       'taxonomy_term/' . $this->term->uuid() . '.yml',
     ];
+
     $this->verifyExportArchiveOnDisk($expected, $unexpected);
   }
 
