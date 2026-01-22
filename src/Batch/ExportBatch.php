@@ -156,23 +156,22 @@ class ExportBatch {
   public static function finished($success, $results, $operations) {
     if ($success && !empty($results['download_archive'])) {
       $session = \Drupal::request()->getSession();
-      $session->set('default_content_ui_download', $results['download_archive']);
       $count = $results['count'] ?? 0;
-      $messenger = \Drupal::messenger();
 
+      $message = new TranslatableMarkup('The export archive is downloading automatically.');
       if ($count > 1) {
-        $messenger->addStatus(new TranslatableMarkup('The export archive for @count items is downloading automatically.', ['@count' => $count]));
+        $message = new TranslatableMarkup('The export archive for @count items is downloading automatically.', ['@count' => $count]);
       }
       elseif ($count === 1 && !empty($results['single_label'])) {
-        $messenger->addStatus(new TranslatableMarkup('The export archive for %label is downloading automatically.', ['%label' => $results['single_label']]));
+        $message = new TranslatableMarkup('The export archive for %label is downloading automatically.', ['%label' => $results['single_label']]);
       }
-      else {
-        $messenger->addStatus(new TranslatableMarkup('The export archive is downloading automatically.'));
-      }
+
+      $session->set('default_content_ui_download', $results['download_archive']);
+      $session->set('default_content_ui_download_message', $message);
 
       $session->save();
     }
-    else {
+    elseif (!$success) {
       \Drupal::messenger()->addError(new TranslatableMarkup('Export failed.'));
     }
   }
