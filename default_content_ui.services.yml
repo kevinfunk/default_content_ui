@@ -14,3 +14,8 @@ services:
       - '@request_stack'
       - '@file_system'
       - '@entity_type.manager'
+
+  default_content_ui.subscriber:
+    class: Drupal\default_content_ui\EventSubscriber\DefaultContentSubscriber
+    tags:
+      - { name: event_subscriber }
