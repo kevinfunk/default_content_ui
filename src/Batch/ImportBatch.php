@@ -76,6 +76,8 @@ class ImportBatch {
     /** @var \Drupal\Core\DefaultContent\Importer $importer */
     $importer = \Drupal::service(Importer::class);
 
+    $entity_type_manager = \Drupal::entityTypeManager();
+    $file_system = \Drupal::service('file_system');
     $scan = scandir($folder);
     $candidates = array_diff($scan, ['.', '..', '__MACOSX']);
     if (count($candidates) === 1) {
@@ -85,8 +87,40 @@ class ImportBatch {
       }
     }
 
+    $content_root = $folder;
+    if (is_dir($folder . '/content')) {
+      $content_root = $folder . '/content';
+    }
+
+    // Allows modules to find sibling folders like 'components/'.
+    \Drupal::moduleHandler()->invokeAll('default_content_ui_pre_import', [$folder]);
+
+    // Make sure only valid entity type folders remain in the folder.
+    $valid_folders = array_diff(scandir($content_root), ['.', '..', '__MACOSX']);
+    foreach ($valid_folders as $item) {
+      $item_path = $content_root . '/' . $item;
+      if (is_dir($item_path)) {
+        $is_valid_type = FALSE;
+        if ($entity_type_manager->hasDefinition($item)) {
+          $def = $entity_type_manager->getDefinition($item);
+          if ($def->getGroup() === 'content') {
+            $is_valid_type = TRUE;
+          }
+        }
+
+        if (!$is_valid_type) {
+          try {
+            $file_system->deleteRecursive($item_path);
+          }
+          catch (\Exception $e) {
+            // Log and ignore.
+          }
+        }
+      }
+    }
+
     try {
-      $finder = new Finder($folder);
+      $finder = new Finder($content_root);
       $importer->importContent($finder, Existing::Skip);
 
       $context['results']['imported'] = TRUE;

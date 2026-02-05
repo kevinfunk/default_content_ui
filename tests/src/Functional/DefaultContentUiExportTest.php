@@ -187,7 +187,7 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $this->drupalGet('test-export-view');
     $this->assertSession()->statusCodeEquals(200);
 
-    // Dynamic Checkbox Selection
+    // Dynamic Checkbox Selection.
     $checkboxes = $this->getSession()->getPage()->findAll('css', 'input[name^="node_bulk_form"]');
     $this->assertCount(3, $checkboxes, 'Found 3 checkboxes for the 3 nodes.');
 
@@ -199,9 +199,9 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $this->submitForm($edit, 'Apply to selected items');
 
     $expected = [
-      'node/' . $this->node->uuid() . '.yml',
-      'node/' . $node2->uuid() . '.yml',
-      'node/' . $node3->uuid() . '.yml',
+      'content/node/' . $this->node->uuid() . '.yml',
+      'content/node/' . $node2->uuid() . '.yml',
+      'content/node/' . $node3->uuid() . '.yml',
     ];
     $this->verifyExportArchiveOnDisk($expected);
   }
@@ -221,8 +221,8 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $this->assertSession()->statusCodeEquals(200);
 
     $expected = [
-      'node/' . $this->node->uuid() . '.yml',
-      'taxonomy_term/' . $this->term->uuid() . '.yml',
+      'content/node/' . $this->node->uuid() . '.yml',
+      'content/taxonomy_term/' . $this->term->uuid() . '.yml',
     ];
     $this->verifyExportArchiveOnDisk($expected);
   }
@@ -242,12 +242,11 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $this->submitForm($edit, 'Export Content');
     $this->assertSession()->statusCodeEquals(200);
 
-    // Expecting ONLY node.
     $expected = [
-      'node/' . $this->node->uuid() . '.yml',
+      'content/node/' . $this->node->uuid() . '.yml',
     ];
     $unexpected = [
-      'taxonomy_term/' . $this->term->uuid() . '.yml',
+      'content/taxonomy_term/' . $this->term->uuid() . '.yml',
     ];
     $this->verifyExportArchiveOnDisk($expected, $unexpected);
   }
@@ -265,8 +264,8 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $this->assertSession()->statusCodeEquals(200);
 
     $expected = [
-      'node/' . $this->node->uuid() . '.yml',
-      'taxonomy_term/' . $this->term->uuid() . '.yml',
+      'content/node/' . $this->node->uuid() . '.yml',
+      'content/taxonomy_term/' . $this->term->uuid() . '.yml',
     ];
     $this->verifyExportArchiveOnDisk($expected);
   }
@@ -284,10 +283,10 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $this->assertSession()->statusCodeEquals(200);
 
     $expected = [
-      'node/' . $this->node->uuid() . '.yml',
+      'content/node/' . $this->node->uuid() . '.yml',
     ];
     $unexpected = [
-      'taxonomy_term/' . $this->term->uuid() . '.yml',
+      'content/taxonomy_term/' . $this->term->uuid() . '.yml',
     ];
 
     $this->verifyExportArchiveOnDisk($expected, $unexpected);

@@ -26,7 +26,7 @@ class DefaultContentSubscriber implements EventSubscriberInterface {
    * 'target_uuid' property is added to entity references.
    *
    * @param \Drupal\Core\DefaultContent\PreExportEvent $event
-   * The pre-export event.
+   *   The pre-export event.
    */
   public function onPreExport(PreExportEvent $event): void {
     $callbacks = $event->getCallbacks();

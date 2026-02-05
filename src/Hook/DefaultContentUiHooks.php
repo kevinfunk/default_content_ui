@@ -114,6 +114,8 @@ class DefaultContentUiHooks {
     }
     $session = $request->getSession();
 
+    $attachments['#cache']['contexts'][] = 'url.query_args';
+
     if ($session->has('default_content_ui_download')) {
       $filename = $session->get('default_content_ui_download');
 
@@ -154,6 +156,7 @@ class DefaultContentUiHooks {
         'default_content_auto_download',
       ];
 
+      // Disable caching for this specific response for the meta tag.
       $attachments['#cache']['max-age'] = 0;
     }
   }

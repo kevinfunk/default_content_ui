@@ -64,7 +64,7 @@ class ExportContentAction extends ActionBase implements ContainerFactoryPluginIn
   /**
    * {@inheritdoc}
    */
-  public function access($object, AccountInterface $account = NULL, $return_as_object = FALSE) {
+  public function access($object, ?AccountInterface $account = NULL, $return_as_object = FALSE) {
     if (!$account) {
       $account = \Drupal::currentUser();
     }
@@ -109,18 +109,23 @@ class ExportContentAction extends ActionBase implements ContainerFactoryPluginIn
       'finished' => [ExportBatch::class, 'finished'],
     ];
 
-    $folder = 'temporary://default_content_export_' . time();
-    $this->fileSystem->prepareDirectory($folder, FileSystemInterface::CREATE_DIRECTORY);
+    // Create Root.
+    $root_folder = 'temporary://default_content_export_' . time();
+    $this->fileSystem->prepareDirectory($root_folder, FileSystemInterface::CREATE_DIRECTORY);
+
+    // Create Content Subdirectory.
+    $content_folder = $root_folder . '/content';
+    $this->fileSystem->prepareDirectory($content_folder, FileSystemInterface::CREATE_DIRECTORY);
 
     foreach ($entities as $entity) {
       $batch['operations'][] = [
         [ExportBatch::class, 'exportSingle'],
-        [$entity->getEntityTypeId(), $entity->id(), $folder, $mode],
+        [$entity->getEntityTypeId(), $entity->id(), $content_folder, $mode],
       ];
     }
 
     $batch['operations'][] = [
-      [ExportBatch::class, 'compress'], [$folder],
+      [ExportBatch::class, 'compress'], [$root_folder],
     ];
 
     batch_set($batch);

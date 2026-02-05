@@ -58,6 +58,9 @@ class ExportBatch {
         $exporter->exportToFile($entity, $folder);
       }
 
+      // Allow other modules to add related files to the folder.
+      \Drupal::moduleHandler()->invokeAll('default_content_ui_export_entity', [$entity, $folder]);
+
       $context['sandbox']['progress']++;
       $context['sandbox']['current_id'] = $entity->id();
 
@@ -103,6 +106,9 @@ class ExportBatch {
     else {
       $exporter->exportToFile($entity, $folder);
     }
+
+    // Allow other modules to add related files to the folder.
+    \Drupal::moduleHandler()->invokeAll('default_content_ui_export_entity', [$entity, $folder]);
   }
 
   /**

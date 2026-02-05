@@ -83,7 +83,7 @@ class DefaultContentUiImportTest extends BrowserTestBase {
     $exported_file = $export_dir . '/node/' . $uuid . '.yml';
     $this->assertFileExists($exported_file);
 
-    $zip->addFile($exported_file, 'node/' . $uuid . '.yml');
+    $zip->addFile($exported_file, 'content/node/' . $uuid . '.yml');
     $zip->close();
 
     // 5. Navigate to Import form and upload the ZIP.

@@ -181,17 +181,22 @@ class ExportBulkForm extends ConfigFormBase {
       'finished' => [ExportBatch::class, 'finished'],
     ];
 
-    $folder = 'temporary://default_content_export_' . time();
-    $this->fileSystem->prepareDirectory($folder, FileSystemInterface::CREATE_DIRECTORY);
+    // Create Root.
+    $root_folder = 'temporary://default_content_export_' . time();
+    $this->fileSystem->prepareDirectory($root_folder, FileSystemInterface::CREATE_DIRECTORY);
+
+    // Create Content Subdirectory.
+    $content_folder = $root_folder . '/content';
+    $this->fileSystem->prepareDirectory($content_folder, FileSystemInterface::CREATE_DIRECTORY);
 
     foreach ($enabled_types as $entity_type) {
       $batch['operations'][] = [
-        [ExportBatch::class, 'export'], [$entity_type, $folder, $mode],
+        [ExportBatch::class, 'export'], [$entity_type, $content_folder, $mode],
       ];
     }
 
     $batch['operations'][] = [
-      [ExportBatch::class, 'compress'], [$folder],
+      [ExportBatch::class, 'compress'], [$root_folder],
     ];
 
     batch_set($batch);
