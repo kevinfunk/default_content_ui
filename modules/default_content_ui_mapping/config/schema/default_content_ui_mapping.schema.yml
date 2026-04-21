@@ -1,0 +1,39 @@
+default_content_ui_mapping.settings:
+  type: config_object
+  label: 'Default Content UI Mapping Settings'
+  mapping:
+    strip_translations:
+      type: boolean
+      label: 'Strip incoming translations'
+    fallback_langcode:
+      type: string
+      label: 'Primary Language Code'
+    excluded_fields:
+      type: sequence
+      label: 'Exclusion Rules'
+      sequence:
+        type: mapping
+        label: 'Exclusion Row'
+        mapping:
+          entity_type:
+            type: string
+            label: 'Entity Type'
+          bundle:
+            type: string
+            label: 'Bundle'
+          field_name:
+            type: string
+            label: 'Field to Exclude'
+    mappings:
+      type: sequence
+      label: 'Field Mappings'
+      sequence:
+        type: mapping
+        label: 'Mapping Row'
+        mapping:
+          source:
+            type: string
+            label: 'Incoming Field Name (Source)'
+          target:
+            type: string
+            label: 'Site Field Name (Target)'

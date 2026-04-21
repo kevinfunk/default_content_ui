@@ -1,0 +1,6 @@
+default_content_ui_mapping.settings:
+  title: 'Field Mapping'
+  description: 'Map incoming field names to the target fields on this site during import.'
+  parent: default_content_ui.admin
+  route_name: default_content_ui_mapping.settings
+  weight: 40

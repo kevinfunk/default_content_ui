@@ -1,0 +1,5 @@
+default_content_ui_mapping.settings_tab:
+  route_name: default_content_ui_mapping.settings
+  base_route: default_content_ui.export_bulk
+  title: 'Field Mapping'
+  weight: 40

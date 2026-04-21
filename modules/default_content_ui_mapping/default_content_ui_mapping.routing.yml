@@ -1,0 +1,7 @@
+default_content_ui_mapping.settings:
+  path: '/admin/config/development/default-content/mapping'
+  defaults:
+    _form: '\Drupal\default_content_ui_mapping\Form\MappingSettingsForm'
+    _title: 'Field Mapping'
+  requirements:
+    _permission: 'administer site configuration'
