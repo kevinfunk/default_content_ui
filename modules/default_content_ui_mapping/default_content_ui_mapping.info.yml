@@ -1,6 +1,6 @@
 name: 'Default Content UI Mapping'
 type: module
-description: 'Allows users to map field names during default content import (e.g., media_image to field_media_image).'
+description: 'Allows users to map field names during default content import.'
 package: Web services
 core_version_requirement: ^11.3
 dependencies:

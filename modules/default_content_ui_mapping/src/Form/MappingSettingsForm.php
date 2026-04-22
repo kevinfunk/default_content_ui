@@ -66,6 +66,11 @@ class MappingSettingsForm extends ConfigFormBase {
       ($config->get('excluded_fields') ?? []);
     $form['exclusion_handling'] = $this->buildExclusionsTable($exclusions, $form_state);
 
+    $value_exclusions = $form_state->isRebuilding() ?
+      ($user_input['value_exclusion_handling']['value_exclusions_wrapper']['value_exclusions'] ?? []) :
+      ($config->get('value_exclusions') ?? []);
+    $form['value_exclusion_handling'] = $this->buildValueExclusionsTable($value_exclusions, $form_state);
+
     $mappings = $form_state->isRebuilding() ?
       ($user_input['field_mapping']['mappings_wrapper']['mappings'] ?? []) :
       ($config->get('mappings') ?? []);
@@ -124,7 +129,7 @@ class MappingSettingsForm extends ConfigFormBase {
   protected function buildExclusionsTable(array $excluded_fields, FormStateInterface $form_state): array {
     $form = [
       '#type' => 'details',
-      '#title' => $this->t('Excluded Fields'),
+      '#title' => $this->t('Excluded Fields (Drop Entire Field)'),
       '#open' => TRUE,
       '#description' => '<p>' . $this->t('Define which incoming fields should be completely removed during import. You can restrict this to specific Entity Types and Bundles.') . '</p>',
     ];
@@ -199,6 +204,119 @@ class MappingSettingsForm extends ConfigFormBase {
       '#ajax' => [
         'callback' => '::exclusionsAjaxCallback',
         'wrapper' => 'exclusions-ajax-wrapper',
+      ],
+      '#button_type' => 'secondary',
+      '#limit_validation_errors' => [],
+    ];
+
+    return $form;
+  }
+
+  /**
+   * Builds the value exclusions table section.
+   *
+   * @param array $value_exclusions
+   *   The existing value exclusions array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current form state.
+   *
+   * @return array
+   *   The form render array for this section.
+   */
+  protected function buildValueExclusionsTable(array $value_exclusions, FormStateInterface $form_state): array {
+    $form = [
+      '#type' => 'details',
+      '#title' => $this->t('Value Exclusions (Drop Specific Values)'),
+      '#open' => TRUE,
+      '#description' => '<p>' . $this->t('Remove specific list items, taxonomy terms, or roles without deleting the entire field. <br><em>Example: For roles, Field = "roles", Property = "target_id", Value = "member".</em>') . '</p>',
+    ];
+
+    $num_rows = $form_state->get('value_exclusions_num_rows') ?? max(1, count($value_exclusions));
+    $form_state->set('value_exclusions_num_rows', $num_rows);
+
+    $form['value_exclusions_wrapper'] = [
+      '#type' => 'container',
+      '#attributes' => ['id' => 'value-exclusions-ajax-wrapper'],
+    ];
+
+    $form['value_exclusions_wrapper']['value_exclusions'] = [
+      '#type' => 'table',
+      '#header' => [
+        $this->t('Entity Type'),
+        $this->t('Bundle (Optional)'),
+        $this->t('Field Name'),
+        $this->t('Property Name'),
+        $this->t('Value to Exclude'),
+        $this->t('Operations'),
+      ],
+    ];
+
+    $entity_type_options = $this->getEntityTypeOptions();
+
+    for ($i = 0; $i < $num_rows; $i++) {
+      $selected_entity_type = $value_exclusions[$i]['entity_type'] ?? '';
+      $bundle_options = $this->getBundleOptions($selected_entity_type);
+
+      $form['value_exclusions_wrapper']['value_exclusions'][$i]['entity_type'] = [
+        '#type' => 'select',
+        '#options' => $entity_type_options,
+        '#empty_option' => $this->t('- Any -'),
+        '#default_value' => $selected_entity_type,
+        '#ajax' => [
+          'callback' => '::valueExclusionsAjaxCallback',
+          'wrapper' => 'value-exclusions-ajax-wrapper',
+        ],
+      ];
+
+      $form['value_exclusions_wrapper']['value_exclusions'][$i]['bundle'] = [
+        '#type' => 'select',
+        '#options' => $bundle_options,
+        '#empty_option' => $this->t('- Any -'),
+        '#default_value' => $value_exclusions[$i]['bundle'] ?? '',
+        '#disabled' => empty($selected_entity_type) || empty($bundle_options),
+      ];
+
+      $form['value_exclusions_wrapper']['value_exclusions'][$i]['field_name'] = [
+        '#type' => 'textfield',
+        '#default_value' => $value_exclusions[$i]['field_name'] ?? '',
+        '#placeholder' => 'e.g., roles',
+        '#size' => 12,
+      ];
+
+      $form['value_exclusions_wrapper']['value_exclusions'][$i]['property'] = [
+        '#type' => 'textfield',
+        '#default_value' => $value_exclusions[$i]['property'] ?? '',
+        '#placeholder' => 'e.g., target_id',
+        '#size' => 12,
+      ];
+
+      $form['value_exclusions_wrapper']['value_exclusions'][$i]['value'] = [
+        '#type' => 'textfield',
+        '#default_value' => $value_exclusions[$i]['value'] ?? '',
+        '#placeholder' => 'e.g., member',
+        '#size' => 15,
+      ];
+
+      $form['value_exclusions_wrapper']['value_exclusions'][$i]['operations'] = [
+        '#type' => 'submit',
+        '#value' => $this->t('Remove'),
+        '#name' => 'remove_val_exclusion_' . $i,
+        '#submit' => ['::removeValueExclusionRow'],
+        '#limit_validation_errors' => [],
+        '#ajax' => [
+          'callback' => '::valueExclusionsAjaxCallback',
+          'wrapper' => 'value-exclusions-ajax-wrapper',
+        ],
+      ];
+    }
+
+    $form['value_exclusions_wrapper']['add_exclusion'] = [
+      '#type' => 'submit',
+      '#value' => $this->t('Add value exclusion'),
+      '#submit' => ['::addValueExclusionRow'],
+      '#ajax' => [
+        'callback' => '::valueExclusionsAjaxCallback',
+        'wrapper' => 'value-exclusions-ajax-wrapper',
       ],
       '#button_type' => 'secondary',
       '#limit_validation_errors' => [],
@@ -313,8 +431,14 @@ class MappingSettingsForm extends ConfigFormBase {
     if (empty($entity_type_id)) {
       return [];
     }
-    $options = [];
+
     $bundles = $this->bundleInfo->getBundleInfo($entity_type_id);
+
+    if (count($bundles) === 1 && key($bundles) === $entity_type_id) {
+      return [];
+    }
+
+    $options = [];
     foreach ($bundles as $bundle_name => $info) {
       $options[$bundle_name] = $info['label'];
     }
@@ -368,6 +492,54 @@ class MappingSettingsForm extends ConfigFormBase {
    */
   public function exclusionsAjaxCallback(array &$form, FormStateInterface $form_state) {
     return $form['exclusion_handling']['exclusions_wrapper'];
+  }
+
+  /**
+   * Adds a value exclusion row to the form.
+   *
+   * @param array $form
+   *   The form structure array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   */
+  public function addValueExclusionRow(array &$form, FormStateInterface $form_state) {
+    $form_state->set('value_exclusions_num_rows', $form_state->get('value_exclusions_num_rows') + 1);
+    $form_state->setRebuild();
+  }
+
+  /**
+   * Removes a value exclusion row from the form.
+   *
+   * @param array $form
+   *   The form structure array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   */
+  public function removeValueExclusionRow(array &$form, FormStateInterface $form_state) {
+    $row_index = $form_state->getTriggeringElement()['#parents'][3];
+    $user_input = $form_state->getUserInput();
+    if (isset($user_input['value_exclusion_handling']['value_exclusions_wrapper']['value_exclusions'][$row_index])) {
+      unset($user_input['value_exclusion_handling']['value_exclusions_wrapper']['value_exclusions'][$row_index]);
+      $user_input['value_exclusion_handling']['value_exclusions_wrapper']['value_exclusions'] = array_values($user_input['value_exclusion_handling']['value_exclusions_wrapper']['value_exclusions']);
+      $form_state->setUserInput($user_input);
+    }
+    $form_state->set('value_exclusions_num_rows', max(1, count($user_input['value_exclusion_handling']['value_exclusions_wrapper']['value_exclusions'] ?? [])));
+    $form_state->setRebuild();
+  }
+
+  /**
+   * AJAX callback for the value exclusions wrapper.
+   *
+   * @param array $form
+   *   The form structure array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   *
+   * @return array
+   *   The form element to replace the wrapper.
+   */
+  public function valueExclusionsAjaxCallback(array &$form, FormStateInterface $form_state) {
+    return $form['value_exclusion_handling']['value_exclusions_wrapper'];
   }
 
   /**
@@ -429,14 +601,36 @@ class MappingSettingsForm extends ConfigFormBase {
       $form_state->setErrorByName('translation_handling][fallback_langcode', $this->t('Language codes cannot contain spaces.'));
     }
 
-    $exclusions = $form_state->getValue(['exclusion_handling', 'exclusions_wrapper', 'excluded_fields']) ?? [];
+    $exclusions = $form_state->getValue([
+      'exclusion_handling',
+      'exclusions_wrapper',
+      'excluded_fields',
+    ]) ?? [];
+
     foreach ($exclusions as $key => $exclusion) {
       if (!empty($exclusion['field_name']) && preg_match('/[^a-z0-9_]/', $exclusion['field_name'])) {
         $form_state->setErrorByName("exclusion_handling][exclusions_wrapper][excluded_fields][$key][field_name", $this->t('Field machine names must contain only lowercase letters, numbers, and underscores.'));
       }
     }
 
-    $mappings = $form_state->getValue(['field_mapping', 'mappings_wrapper', 'mappings']) ?? [];
+    $value_exclusions = $form_state->getValue([
+      'value_exclusion_handling',
+      'value_exclusions_wrapper',
+      'value_exclusions',
+    ]) ?? [];
+
+    foreach ($value_exclusions as $key => $rule) {
+      if (!empty($rule['field_name']) && empty($rule['property'])) {
+        $form_state->setErrorByName("value_exclusion_handling][value_exclusions_wrapper][value_exclusions][$key][property", $this->t('Property name is required when applying a value exclusion.'));
+      }
+    }
+
+    $mappings = $form_state->getValue([
+      'field_mapping',
+      'mappings_wrapper',
+      'mappings',
+    ]) ?? [];
+
     foreach ($mappings as $key => $mapping) {
       if (!empty($mapping['source']) && preg_match('/[^a-z0-9_]/', $mapping['source'])) {
         $form_state->setErrorByName("field_mapping][mappings_wrapper][mappings][$key][source", $this->t('Source machine names must contain only lowercase letters, numbers, and underscores.'));
@@ -451,7 +645,11 @@ class MappingSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    $submitted_mappings = $form_state->getValue(['field_mapping', 'mappings_wrapper', 'mappings']) ?? [];
+    $submitted_mappings = $form_state->getValue([
+      'field_mapping',
+      'mappings_wrapper',
+      'mappings',
+    ]) ?? [];
     $valid_mappings = [];
     foreach ($submitted_mappings as $mapping) {
       if (!empty($mapping['source']) && !empty($mapping['target'])) {
@@ -459,7 +657,11 @@ class MappingSettingsForm extends ConfigFormBase {
       }
     }
 
-    $submitted_exclusions = $form_state->getValue(['exclusion_handling', 'exclusions_wrapper', 'excluded_fields']) ?? [];
+    $submitted_exclusions = $form_state->getValue([
+      'exclusion_handling',
+      'exclusions_wrapper',
+      'excluded_fields',
+    ]) ?? [];
     $valid_exclusions = [];
     foreach ($submitted_exclusions as $exclusion) {
       if (!empty($exclusion['field_name'])) {
@@ -471,10 +673,29 @@ class MappingSettingsForm extends ConfigFormBase {
       }
     }
 
+    $submitted_val_exclusions = $form_state->getValue([
+      'value_exclusion_handling',
+      'value_exclusions_wrapper',
+      'value_exclusions',
+    ]) ?? [];
+    $valid_val_exclusions = [];
+    foreach ($submitted_val_exclusions as $rule) {
+      if (!empty($rule['field_name']) && !empty($rule['property'])) {
+        $valid_val_exclusions[] = [
+          'entity_type' => $rule['entity_type'] ?? '',
+          'bundle' => $rule['bundle'] ?? '',
+          'field_name' => trim($rule['field_name']),
+          'property' => trim($rule['property']),
+          'value' => trim($rule['value']),
+        ];
+      }
+    }
+
     $this->config('default_content_ui_mapping.settings')
       ->set('strip_translations', (bool) $form_state->getValue(['translation_handling', 'strip_translations']))
       ->set('fallback_langcode', $form_state->getValue(['translation_handling', 'fallback_langcode']))
       ->set('excluded_fields', $valid_exclusions)
+      ->set('value_exclusions', $valid_val_exclusions)
       ->set('mappings', $valid_mappings)
       ->save();
 

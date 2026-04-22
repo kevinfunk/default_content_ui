@@ -52,10 +52,11 @@ class MappingHooks implements ContainerInjectionInterface {
 
     $mappings = array_column($config->get('mappings') ?? [], 'target', 'source');
     $exclusion_rules = $config->get('excluded_fields') ?? [];
+    $value_exclusions = $config->get('value_exclusions') ?? [];
     $strip_translations = (bool) $config->get('strip_translations');
 
     // Bail early if no processing is configured.
-    if (empty($mappings) && !$strip_translations && empty($exclusion_rules)) {
+    if (empty($mappings) && !$strip_translations && empty($exclusion_rules) && empty($value_exclusions)) {
       return;
     }
 
@@ -63,7 +64,7 @@ class MappingHooks implements ContainerInjectionInterface {
     $files = $this->fileSystem->scanDirectory($content_root, '/\.yml$/');
 
     foreach ($files as $file) {
-      $this->processFile($file->uri, $mappings, $exclusion_rules, $strip_translations, $config->get('fallback_langcode') ?: 'default');
+      $this->processFile($file->uri, $mappings, $exclusion_rules, $value_exclusions, $strip_translations, $config->get('fallback_langcode') ?: 'default');
     }
   }
 
@@ -76,12 +77,14 @@ class MappingHooks implements ContainerInjectionInterface {
    *   The field mapping rules.
    * @param array $exclusion_rules
    *   The field exclusion rules.
+   * @param array $value_exclusions
+   *   The value exclusion rules.
    * @param bool $strip_translations
    *   Whether to strip non-fallback translations.
    * @param string $fallback_langcode
    *   The primary language code to retain.
    */
-  protected function processFile(string $uri, array $mappings, array $exclusion_rules, bool $strip_translations, string $fallback_langcode): void {
+  protected function processFile(string $uri, array $mappings, array $exclusion_rules, array $value_exclusions, bool $strip_translations, string $fallback_langcode): void {
     try {
       $data = Yaml::decode(file_get_contents($uri));
     }
@@ -103,7 +106,7 @@ class MappingHooks implements ContainerInjectionInterface {
       $changed = $this->stripTranslations($data, $fallback_langcode) || $changed;
     }
 
-    $changed = $this->applyRules($data, $mappings, $exclusion_rules) || $changed;
+    $changed = $this->applyRules($data, $mappings, $exclusion_rules, $value_exclusions) || $changed;
 
     if ($changed) {
       file_put_contents($uri, Yaml::encode($data));
@@ -161,19 +164,21 @@ class MappingHooks implements ContainerInjectionInterface {
    *   The field mapping rules.
    * @param array $exclusion_rules
    *   The field exclusion rules.
+   * @param array $value_exclusions
+   *   The value exclusion rules.
    *
    * @return bool
    *   TRUE if the data was modified, FALSE otherwise.
    */
-  protected function applyRules(array &$data, array $mappings, array $exclusion_rules): bool {
+  protected function applyRules(array &$data, array $mappings, array $exclusion_rules, array $value_exclusions): bool {
     $changed = FALSE;
 
-    if (empty($mappings) && empty($exclusion_rules)) {
+    if (empty($mappings) && empty($exclusion_rules) && empty($value_exclusions)) {
       return FALSE;
     }
 
     $entity_type = $data['_meta']['entity_type'] ?? '';
-    $bundle = $data['_meta']['bundle'] ?? '';
+    $bundle = $data['_meta']['bundle'] ?? $entity_type;
 
     foreach ($data as $langcode => &$translation_data) {
       if ($langcode === '_meta' || !is_array($translation_data)) {
@@ -192,6 +197,35 @@ class MappingHooks implements ContainerInjectionInterface {
         if (array_key_exists($field, $translation_data)) {
           unset($translation_data[$field]);
           $changed = TRUE;
+        }
+      }
+
+      foreach ($value_exclusions as $rule) {
+        if (!empty($rule['entity_type']) && $rule['entity_type'] !== $entity_type) {
+          continue;
+        }
+        if (!empty($rule['bundle']) && $rule['bundle'] !== $bundle) {
+          continue;
+        }
+
+        $field = $rule['field_name'];
+        $property = $rule['property'];
+        $target_value = $rule['value'];
+
+        if (!empty($translation_data[$field]) && is_array($translation_data[$field])) {
+          $field_changed = FALSE;
+
+          foreach ($translation_data[$field] as $index => $item) {
+            if (isset($item[$property]) && (string) $item[$property] === (string) $target_value) {
+              unset($translation_data[$field][$index]);
+              $field_changed = TRUE;
+              $changed = TRUE;
+            }
+          }
+
+          if ($field_changed) {
+            $translation_data[$field] = array_values($translation_data[$field]);
+          }
         }
       }
 

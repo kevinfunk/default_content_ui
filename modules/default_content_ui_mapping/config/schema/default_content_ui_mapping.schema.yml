@@ -24,6 +24,28 @@ default_content_ui_mapping.settings:
           field_name:
             type: string
             label: 'Field to Exclude'
+    value_exclusions:
+      type: sequence
+      label: 'Value Exclusion Rules'
+      sequence:
+        type: mapping
+        label: 'Value Exclusion Row'
+        mapping:
+          entity_type:
+            type: string
+            label: 'Entity Type'
+          bundle:
+            type: string
+            label: 'Bundle'
+          field_name:
+            type: string
+            label: 'Field Name'
+          property:
+            type: string
+            label: 'Property (e.g., target_id)'
+          value:
+            type: string
+            label: 'Value to Exclude'
     mappings:
       type: sequence
       label: 'Field Mappings'

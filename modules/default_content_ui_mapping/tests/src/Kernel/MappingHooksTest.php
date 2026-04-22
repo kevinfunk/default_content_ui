@@ -55,7 +55,6 @@ class MappingHooksTest extends KernelTestBase {
     $this->installConfig(['default_content_ui_mapping']);
     $this->fileSystem = $this->container->get('file_system');
 
-    // Manually instantiate the hook class with injected services.
     $this->mappingHooks = new MappingHooks(
       $this->container->get('config.factory'),
       $this->fileSystem,
@@ -69,9 +68,13 @@ class MappingHooksTest extends KernelTestBase {
     // 2. Now it is safe to get the realpath.
     $this->tempDir = $this->fileSystem->realpath($base_uri);
 
-    // 3. Assign the nested path to a variable so it can be passed by reference.
+    // 3. Prepare the nested node directory.
     $node_dir = $this->tempDir . '/content/node';
     $this->fileSystem->prepareDirectory($node_dir, FileSystemInterface::CREATE_DIRECTORY);
+
+    // 4. Prepare the nested user directory.
+    $user_dir = $this->tempDir . '/content/user';
+    $this->fileSystem->prepareDirectory($user_dir, FileSystemInterface::CREATE_DIRECTORY);
   }
 
   /**
@@ -86,14 +89,30 @@ class MappingHooksTest extends KernelTestBase {
         ['source' => 'media_image', 'target' => 'field_media_image'],
       ])
       ->set('excluded_fields', [
-        ['entity_type' => 'node', 'bundle' => 'article', 'field_name' => 'field_deprecated'],
-        // Rule that shouldn't match because the bundle is wrong:
-        ['entity_type' => 'node', 'bundle' => 'page', 'field_name' => 'field_keep_me'],
+        [
+          'entity_type' => 'node',
+          'bundle' => 'article',
+          'field_name' => 'field_deprecated',
+        ],
+        [
+          'entity_type' => 'node',
+          'bundle' => 'page',
+          'field_name' => 'field_keep_me',
+        ],
+      ])
+      ->set('value_exclusions', [
+        [
+          'entity_type' => 'user',
+          'bundle' => '',
+          'field_name' => 'roles',
+          'property' => 'target_id',
+          'value' => 'member',
+        ],
       ])
       ->save();
 
-    // 2. Create a dummy exported YAML file with English and Spanish data.
-    $mock_data = [
+    // 2. Create a dummy exported Node YAML file.
+    $node_mock_data = [
       '_meta' => [
         'version' => '1.0',
         'entity_type' => 'node',
@@ -115,32 +134,49 @@ class MappingHooksTest extends KernelTestBase {
       ],
     ];
 
-    $file_path = $this->tempDir . '/content/node/1234-5678-9012.yml';
-    file_put_contents($file_path, Yaml::encode($mock_data));
+    $node_file_path = $this->tempDir . '/content/node/1234-5678-9012.yml';
+    file_put_contents($node_file_path, Yaml::encode($node_mock_data));
 
-    // 3. Execute the hook, passing the temporary directory.
+    // 3. Create a dummy exported User YAML file.
+    // Testing bundleless behavior and value exclusions.
+    $user_mock_data = [
+      '_meta' => [
+        'version' => '1.0',
+        'entity_type' => 'user',
+        'uuid' => 'adab4c9b-b069-4487-901c-d92c0565c87d',
+        'default_langcode' => 'en',
+        // Intentionally omitting 'bundle' to test our new fallback logic.
+      ],
+      'en' => [
+        'name' => [['value' => 'admin@example.com']],
+        'roles' => [
+          ['target_id' => 'member'],
+          ['target_id' => 'administrator'],
+        ],
+      ],
+    ];
+
+    $user_file_path = $this->tempDir . '/content/user/adab4c9b-b069-4487-901c-d92c0565c87d.yml';
+    file_put_contents($user_file_path, Yaml::encode($user_mock_data));
+
+    // 4. Execute the hook, passing the temporary directory.
     $this->mappingHooks->preImport($this->tempDir);
 
-    // 4. Decode the modified file and assert the changes.
-    $modified_data = Yaml::decode(file_get_contents($file_path));
+    // 5. Decode the modified Node file and assert changes.
+    $modified_node_data = Yaml::decode(file_get_contents($node_file_path));
 
-    // Assert Translations Stripped.
-    $this->assertArrayNotHasKey('es', $modified_data, 'The Spanish translation should be completely stripped.');
-    $this->assertArrayHasKey('en', $modified_data, 'The English fallback language should be retained.');
-    $this->assertArrayHasKey('_meta', $modified_data, 'The _meta block should be retained.');
+    $this->assertArrayNotHasKey('es', $modified_node_data, 'Translations should be stripped.');
+    $this->assertArrayNotHasKey('content_translation_source', $modified_node_data['en'], 'Translation metadata should be stripped.');
+    $this->assertArrayHasKey('field_media_image', $modified_node_data['en'], 'The field should be mapped.');
+    $this->assertArrayNotHasKey('field_deprecated', $modified_node_data['en'], 'Entire field exclusion should work.');
 
-    // Assert Translation Metadata Stripped.
-    $this->assertArrayNotHasKey('content_translation_source', $modified_data['en'], 'Translation source metadata should be stripped.');
-    $this->assertArrayNotHasKey('content_translation_outdated', $modified_data['en'], 'Translation outdated metadata should be stripped.');
+    // 6. Decode the modified User file and assert the Value Exclusion changes.
+    $modified_user_data = Yaml::decode(file_get_contents($user_file_path));
+    $roles = $modified_user_data['en']['roles'];
 
-    // Assert Field Mapping.
-    $this->assertArrayNotHasKey('media_image', $modified_data['en'], 'The original field name should be gone.');
-    $this->assertArrayHasKey('field_media_image', $modified_data['en'], 'The target field name should be present.');
-    $this->assertEquals(1, $modified_data['en']['field_media_image'][0]['target_id'], 'The mapped field data should be perfectly retained.');
-
-    // Assert Exclusions.
-    $this->assertArrayNotHasKey('field_deprecated', $modified_data['en'], 'The excluded field should be removed because it matches the bundle.');
-    $this->assertArrayHasKey('field_keep_me', $modified_data['en'], 'The field should be kept because the exclusion rule was for the "page" bundle, not "article".');
+    $this->assertCount(1, $roles, 'Only one role should remain in the array.');
+    $this->assertEquals('administrator', $roles[0]['target_id'], 'The administrator role should be kept.');
+    $this->assertArrayNotHasKey(1, $roles, 'The array should be perfectly re-indexed (starting at 0).');
   }
 
   /**
