@@ -84,7 +84,7 @@ class MappingHooksTest extends KernelTestBase {
     // 1. Set up the active configuration for the submodule.
     $this->config('default_content_ui_mapping.settings')
       ->set('strip_translations', TRUE)
-      ->set('fallback_langcode', 'en')
+      ->set('fallback_langcode', 'fr')
       ->set('mappings', [
         ['source' => 'media_image', 'target' => 'field_media_image'],
       ])
@@ -111,7 +111,11 @@ class MappingHooksTest extends KernelTestBase {
       ])
       ->save();
 
-    // 2. Create a dummy exported Node YAML file.
+    // 2. Create a dummy exported Node YAML file, matching the real shape
+    // produced by \Drupal\Core\DefaultContent\Exporter: the default
+    // translation's field values live under 'default', and every other
+    // translation lives under 'translations.<langcode>' — never as bare
+    // top-level langcode keys.
     $node_mock_data = [
       '_meta' => [
         'version' => '1.0',
@@ -120,7 +124,7 @@ class MappingHooksTest extends KernelTestBase {
         'bundle' => 'article',
         'default_langcode' => 'en',
       ],
-      'en' => [
+      'default' => [
         'title' => [['value' => 'English Title']],
         'media_image' => [['target_id' => 1]],
         'field_deprecated' => [['value' => 'Old data to strip']],
@@ -128,9 +132,21 @@ class MappingHooksTest extends KernelTestBase {
         'content_translation_source' => [['value' => 'und']],
         'content_translation_outdated' => [['value' => 0]],
       ],
-      'es' => [
-        'title' => [['value' => 'Spanish Title']],
-        'content_translation_source' => [['value' => 'en']],
+      'translations' => [
+        // 'es' is not the configured fallback_langcode ('fr'), so it must
+        // be stripped entirely.
+        'es' => [
+          'title' => [['value' => 'Spanish Title']],
+          'content_translation_source' => [['value' => 'en']],
+        ],
+        // 'fr' is the configured fallback_langcode, so it must be kept —
+        // and mapping/exclusion/meta-stripping must still apply to it,
+        // not just to 'default'.
+        'fr' => [
+          'title' => [['value' => 'French Title']],
+          'field_deprecated' => [['value' => 'Old data to strip']],
+          'content_translation_source' => [['value' => 'en']],
+        ],
       ],
     ];
 
@@ -147,7 +163,7 @@ class MappingHooksTest extends KernelTestBase {
         'default_langcode' => 'en',
         // Intentionally omitting 'bundle' to test our new fallback logic.
       ],
-      'en' => [
+      'default' => [
         'name' => [['value' => 'admin@example.com']],
         'roles' => [
           ['target_id' => 'member'],
@@ -165,14 +181,19 @@ class MappingHooksTest extends KernelTestBase {
     // 5. Decode the modified Node file and assert changes.
     $modified_node_data = Yaml::decode(file_get_contents($node_file_path));
 
-    $this->assertArrayNotHasKey('es', $modified_node_data, 'Translations should be stripped.');
-    $this->assertArrayNotHasKey('content_translation_source', $modified_node_data['en'], 'Translation metadata should be stripped.');
-    $this->assertArrayHasKey('field_media_image', $modified_node_data['en'], 'The field should be mapped.');
-    $this->assertArrayNotHasKey('field_deprecated', $modified_node_data['en'], 'Entire field exclusion should work.');
+    $this->assertArrayNotHasKey('es', $modified_node_data['translations'] ?? [], 'The non-fallback translation should be stripped.');
+    $this->assertArrayHasKey('fr', $modified_node_data['translations'], 'The fallback translation should be kept.');
+
+    $this->assertArrayNotHasKey('content_translation_source', $modified_node_data['default'], 'Translation metadata should be stripped from the default translation.');
+    $this->assertArrayHasKey('field_media_image', $modified_node_data['default'], 'The field should be mapped in the default translation.');
+    $this->assertArrayNotHasKey('field_deprecated', $modified_node_data['default'], 'Entire field exclusion should work on the default translation.');
+
+    $this->assertArrayNotHasKey('content_translation_source', $modified_node_data['translations']['fr'], 'Translation metadata should also be stripped from the kept translation.');
+    $this->assertArrayNotHasKey('field_deprecated', $modified_node_data['translations']['fr'], 'Field exclusion should also apply to the kept translation, not just the default one.');
 
     // 6. Decode the modified User file and assert the Value Exclusion changes.
     $modified_user_data = Yaml::decode(file_get_contents($user_file_path));
-    $roles = $modified_user_data['en']['roles'];
+    $roles = $modified_user_data['default']['roles'];
 
     $this->assertCount(1, $roles, 'Only one role should remain in the array.');
     $this->assertEquals('administrator', $roles[0]['target_id'], 'The administrator role should be kept.');

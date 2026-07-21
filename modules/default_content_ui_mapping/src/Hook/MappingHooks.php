@@ -116,10 +116,16 @@ class MappingHooks implements ContainerInjectionInterface {
   /**
    * Removes non-fallback translations and metadata.
    *
+   * Default-content YAML stores the default-language field values under
+   * 'default' and every other translation under 'translations.<langcode>'
+   * (see \Drupal\Core\DefaultContent\Exporter::exportEntity()) — 'default'
+   * is always retained here, and $fallback_langcode names the one
+   * additional translation (if any) to keep from 'translations'.
+   *
    * @param array $data
    *   The parsed YAML data array.
    * @param string $fallback_langcode
-   *   The language code to retain.
+   *   The langcode of the one additional translation to retain, if any.
    *
    * @return bool
    *   TRUE if the data was modified, FALSE otherwise.
@@ -128,18 +134,26 @@ class MappingHooks implements ContainerInjectionInterface {
     $changed = FALSE;
     $stripped_langs = [];
 
-    foreach (array_keys($data) as $langcode) {
-      if (!in_array($langcode, ['_meta', 'default', $fallback_langcode], TRUE)) {
-        $stripped_langs[] = $langcode;
-        unset($data[$langcode]);
-        $changed = TRUE;
+    if (isset($data['translations']) && is_array($data['translations'])) {
+      foreach (array_keys($data['translations']) as $langcode) {
+        if ($langcode !== $fallback_langcode) {
+          $stripped_langs[] = $langcode;
+          unset($data['translations'][$langcode]);
+          $changed = TRUE;
+        }
       }
-      elseif ($langcode !== '_meta' && is_array($data[$langcode])) {
-        foreach (['content_translation_source', 'content_translation_outdated'] as $meta_field) {
-          if (isset($data[$langcode][$meta_field])) {
-            unset($data[$langcode][$meta_field]);
-            $changed = TRUE;
-          }
+      if (empty($data['translations'])) {
+        unset($data['translations']);
+      }
+    }
+
+    if (isset($data['default']) && is_array($data['default'])) {
+      $changed = $this->stripTranslationMetaFields($data['default']) || $changed;
+    }
+    if (isset($data['translations']) && is_array($data['translations'])) {
+      foreach ($data['translations'] as &$translation_data) {
+        if (is_array($translation_data)) {
+          $changed = $this->stripTranslationMetaFields($translation_data) || $changed;
         }
       }
     }
@@ -156,7 +170,32 @@ class MappingHooks implements ContainerInjectionInterface {
   }
 
   /**
+   * Removes translation-tracking metadata fields from one translation block.
+   *
+   * @param array $translation_data
+   *   A single translation's field-values array (by reference).
+   *
+   * @return bool
+   *   TRUE if the data was modified, FALSE otherwise.
+   */
+  protected function stripTranslationMetaFields(array &$translation_data): bool {
+    $changed = FALSE;
+    foreach (['content_translation_source', 'content_translation_outdated'] as $meta_field) {
+      if (isset($translation_data[$meta_field])) {
+        unset($translation_data[$meta_field]);
+        $changed = TRUE;
+      }
+    }
+    return $changed;
+  }
+
+  /**
    * Applies field mappings and exclusion rules to the data array.
+   *
+   * Applied to 'default' (the default-language field values) and every
+   * entry of 'translations' (the other per-langcode field values) — see
+   * the note on stripTranslations() about the actual default-content
+   * YAML shape.
    *
    * @param array $data
    *   The parsed YAML data array.
@@ -171,70 +210,100 @@ class MappingHooks implements ContainerInjectionInterface {
    *   TRUE if the data was modified, FALSE otherwise.
    */
   protected function applyRules(array &$data, array $mappings, array $exclusion_rules, array $value_exclusions): bool {
-    $changed = FALSE;
-
     if (empty($mappings) && empty($exclusion_rules) && empty($value_exclusions)) {
       return FALSE;
     }
 
     $entity_type = $data['_meta']['entity_type'] ?? '';
     $bundle = $data['_meta']['bundle'] ?? $entity_type;
+    $changed = FALSE;
 
-    foreach ($data as $langcode => &$translation_data) {
-      if ($langcode === '_meta' || !is_array($translation_data)) {
+    if (isset($data['default']) && is_array($data['default'])) {
+      $changed = $this->applyRulesToTranslation($data['default'], $entity_type, $bundle, $mappings, $exclusion_rules, $value_exclusions) || $changed;
+    }
+
+    if (isset($data['translations']) && is_array($data['translations'])) {
+      foreach ($data['translations'] as &$translation_data) {
+        if (is_array($translation_data)) {
+          $changed = $this->applyRulesToTranslation($translation_data, $entity_type, $bundle, $mappings, $exclusion_rules, $value_exclusions) || $changed;
+        }
+      }
+    }
+
+    return $changed;
+  }
+
+  /**
+   * Applies field mappings and exclusion rules to a single translation.
+   *
+   * @param array $translation_data
+   *   A single translation's field-values array (by reference).
+   * @param string $entity_type
+   *   The entity type the rules should be scoped to, if set.
+   * @param string $bundle
+   *   The bundle the rules should be scoped to, if set.
+   * @param array $mappings
+   *   The field mapping rules.
+   * @param array $exclusion_rules
+   *   The field exclusion rules.
+   * @param array $value_exclusions
+   *   The value exclusion rules.
+   *
+   * @return bool
+   *   TRUE if the data was modified, FALSE otherwise.
+   */
+  protected function applyRulesToTranslation(array &$translation_data, string $entity_type, string $bundle, array $mappings, array $exclusion_rules, array $value_exclusions): bool {
+    $changed = FALSE;
+
+    foreach ($exclusion_rules as $rule) {
+      if (!empty($rule['entity_type']) && $rule['entity_type'] !== $entity_type) {
+        continue;
+      }
+      if (!empty($rule['bundle']) && $rule['bundle'] !== $bundle) {
         continue;
       }
 
-      foreach ($exclusion_rules as $rule) {
-        if (!empty($rule['entity_type']) && $rule['entity_type'] !== $entity_type) {
-          continue;
-        }
-        if (!empty($rule['bundle']) && $rule['bundle'] !== $bundle) {
-          continue;
-        }
+      $field = $rule['field_name'];
+      if (array_key_exists($field, $translation_data)) {
+        unset($translation_data[$field]);
+        $changed = TRUE;
+      }
+    }
 
-        $field = $rule['field_name'];
-        if (array_key_exists($field, $translation_data)) {
-          unset($translation_data[$field]);
-          $changed = TRUE;
-        }
+    foreach ($value_exclusions as $rule) {
+      if (!empty($rule['entity_type']) && $rule['entity_type'] !== $entity_type) {
+        continue;
+      }
+      if (!empty($rule['bundle']) && $rule['bundle'] !== $bundle) {
+        continue;
       }
 
-      foreach ($value_exclusions as $rule) {
-        if (!empty($rule['entity_type']) && $rule['entity_type'] !== $entity_type) {
-          continue;
-        }
-        if (!empty($rule['bundle']) && $rule['bundle'] !== $bundle) {
-          continue;
-        }
+      $field = $rule['field_name'];
+      $property = $rule['property'];
+      $target_value = $rule['value'];
 
-        $field = $rule['field_name'];
-        $property = $rule['property'];
-        $target_value = $rule['value'];
+      if (!empty($translation_data[$field]) && is_array($translation_data[$field])) {
+        $field_changed = FALSE;
 
-        if (!empty($translation_data[$field]) && is_array($translation_data[$field])) {
-          $field_changed = FALSE;
-
-          foreach ($translation_data[$field] as $index => $item) {
-            if (isset($item[$property]) && (string) $item[$property] === (string) $target_value) {
-              unset($translation_data[$field][$index]);
-              $field_changed = TRUE;
-              $changed = TRUE;
-            }
+        foreach ($translation_data[$field] as $index => $item) {
+          if (isset($item[$property]) && (string) $item[$property] === (string) $target_value) {
+            unset($translation_data[$field][$index]);
+            $field_changed = TRUE;
+            $changed = TRUE;
           }
+        }
 
-          if ($field_changed) {
-            $translation_data[$field] = array_values($translation_data[$field]);
-          }
+        if ($field_changed) {
+          $translation_data[$field] = array_values($translation_data[$field]);
         }
       }
+    }
 
-      foreach ($mappings as $source => $target) {
-        if (array_key_exists($source, $translation_data)) {
-          $translation_data[$target] = $translation_data[$source];
-          unset($translation_data[$source]);
-          $changed = TRUE;
-        }
+    foreach ($mappings as $source => $target) {
+      if (array_key_exists($source, $translation_data)) {
+        $translation_data[$target] = $translation_data[$source];
+        unset($translation_data[$source]);
+        $changed = TRUE;
       }
     }
 
