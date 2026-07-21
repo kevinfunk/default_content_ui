@@ -135,8 +135,13 @@ class SettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
+    // Drupal's tableselect element returns whatever keys the client
+    // submitted rather than validating them against #options, so a forged
+    // POST could otherwise request an entity type that isn't offered here
+    // (e.g. lacking a canonical link template, which the "Export" tab and
+    // operation link both need) — mirrors the same fix in ExportBulkForm.
     $selected = array_filter($form_state->getValue('local_export_types'));
-    $enabled_types = array_keys($selected);
+    $enabled_types = array_intersect(array_keys($selected), $this->getEligibleEntityTypeIds());
     $reference_mode = (bool) $form_state->getValue('references');
 
     $this->config('default_content_ui.settings')
@@ -147,6 +152,26 @@ class SettingsForm extends ConfigFormBase {
     $this->localTaskManager->clearCachedDefinitions();
 
     parent::submitForm($form, $form_state);
+  }
+
+  /**
+   * Returns the IDs of entity types eligible for single-entity export.
+   *
+   * Matches the criteria buildForm() uses to populate #options: content
+   * entity types with a canonical link template (needed by the "Export"
+   * tab and operation link).
+   *
+   * @return string[]
+   *   The eligible entity type IDs.
+   */
+  protected function getEligibleEntityTypeIds(): array {
+    $ids = [];
+    foreach ($this->entityTypeManager->getDefinitions() as $entity_type_id => $entity_type) {
+      if ($entity_type->getGroup() === 'content' && $entity_type->hasLinkTemplate('canonical')) {
+        $ids[] = $entity_type_id;
+      }
+    }
+    return $ids;
   }
 
 }
