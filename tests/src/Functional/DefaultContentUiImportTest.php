@@ -104,4 +104,53 @@ class DefaultContentUiImportTest extends BrowserTestBase {
     $this->assertEquals('Imported Test Node', $imported_node->getTitle());
   }
 
+  /**
+   * Tests that an archive with too many entries is rejected.
+   */
+  public function testImportRejectsTooManyFiles() {
+    $admin_user = $this->drupalCreateUser(['default content import', 'access administration pages']);
+    $this->drupalLogin($admin_user);
+
+    $file_system = \Drupal::service('file_system');
+    $zip_path = $file_system->realpath('temporary://test_too_many_files.zip');
+    $zip = new \ZipArchive();
+    $zip->open($zip_path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+    for ($i = 0; $i <= 5000; $i++) {
+      $zip->addFromString("content/node/file_$i.yml", '');
+    }
+    $zip->close();
+
+    $this->drupalGet('/admin/config/development/default-content/import');
+    $this->submitForm(['files[archive]' => $zip_path], 'Import Content');
+
+    $this->assertSession()->pageTextContains('too many entries');
+  }
+
+  /**
+   * Tests that an archive with an excessive uncompressed size is rejected.
+   *
+   * A small, highly compressible upload can still decompress to gigabytes,
+   * so the guard checks the *uncompressed* size recorded in the archive,
+   * independent of the (already size-limited) compressed upload itself.
+   */
+  public function testImportRejectsExcessiveUncompressedSize() {
+    $admin_user = $this->drupalCreateUser(['default content import', 'access administration pages']);
+    $this->drupalLogin($admin_user);
+
+    $file_system = \Drupal::service('file_system');
+    $zip_path = $file_system->realpath('temporary://test_zip_bomb.zip');
+    $zip = new \ZipArchive();
+    $zip->open($zip_path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+    // Highly repetitive content compresses down to almost nothing, keeping
+    // the actual upload tiny while the archive's recorded uncompressed size
+    // still exceeds the 200MB cap.
+    $zip->addFromString('content/node/bomb.yml', str_repeat('0', 201 * 1024 * 1024));
+    $zip->close();
+
+    $this->drupalGet('/admin/config/development/default-content/import');
+    $this->submitForm(['files[archive]' => $zip_path], 'Import Content');
+
+    $this->assertSession()->pageTextContains('too large');
+  }
+
 }

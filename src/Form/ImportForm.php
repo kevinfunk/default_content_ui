@@ -54,6 +54,7 @@ class ImportForm extends FormBase {
       '#description' => $this->t('<strong>Format:</strong> .zip<br><strong>Structure:</strong> The archive must contain folders named by entity type (e.g., <em>node</em>, <em>taxonomy_term</em>) containing YAML files.'),
       '#upload_validators' => [
         'FileExtension' => ['extensions' => 'zip'],
+        'FileSizeLimit' => ['fileLimit' => 50 * 1024 * 1024],
       ],
       '#upload_location' => 'temporary://',
       '#required' => TRUE,
