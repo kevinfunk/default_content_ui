@@ -157,8 +157,13 @@ class ExportBulkForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
+    // Drupal's tableselect element returns whatever keys the client
+    // submitted rather than validating them against #options, so a forged
+    // POST could otherwise request export of any entity type Drupal knows
+    // about (including config entities the core DefaultContent Exporter
+    // isn't built to handle), not just the content-group types shown here.
     $selected = array_filter($form_state->getValue('bulk_export_types'));
-    $enabled_types = array_keys($selected);
+    $enabled_types = array_intersect(array_keys($selected), $this->getContentEntityTypeIds());
     $reference_mode = (bool) $form_state->getValue('references');
 
     $this->config('default_content_ui.settings')
@@ -200,6 +205,22 @@ class ExportBulkForm extends ConfigFormBase {
     ];
 
     batch_set($batch);
+  }
+
+  /**
+   * Returns the IDs of all entity types in the "content" group.
+   *
+   * @return string[]
+   *   The content entity type IDs.
+   */
+  protected function getContentEntityTypeIds(): array {
+    $ids = [];
+    foreach ($this->entityTypeManager->getDefinitions() as $type_id => $type_object) {
+      if ($type_object->getGroup() === 'content') {
+        $ids[] = $type_id;
+      }
+    }
+    return $ids;
   }
 
 }
