@@ -37,6 +37,7 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     'views',
     'serialization',
     'default_content_ui',
+    'block',
   ];
 
   /**
@@ -65,6 +66,11 @@ class DefaultContentUiExportTest extends BrowserTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
+
+    // Needed so the "Export" local task is actually rendered on the node's
+    // canonical page for the CSRF-token-carrying clickLink() flow below —
+    // the 'stark' theme places no blocks by default.
+    $this->drupalPlaceBlock('local_tasks_block', ['region' => 'content']);
 
     $vocabulary = Vocabulary::create([
       'vid' => 'tags',
@@ -260,7 +266,16 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $this->submitForm(['local_export_types[node]' => 'node', 'references' => TRUE], 'Save configuration');
     $this->rebuildAll();
 
-    $this->drupalGet($this->node->toUrl('canonical')->toString() . '/default-content-export');
+    // Navigate to the node's own page and follow the rendered local task
+    // link, rather than building the URL directly: the CSRF token this
+    // route now requires is only computed correctly against the current
+    // browser session when generated as part of an actual page render.
+    $this->drupalGet($this->node->toUrl());
+    $this->clickLink('Export');
+    // clickLink() clicks the element directly, bypassing drupalGet()'s
+    // meta-refresh chasing — needed here since the export runs as a
+    // multi-step, non-JS batch that progresses via meta refresh.
+    $this->checkForMetaRefresh();
     $this->assertSession()->statusCodeEquals(200);
 
     $expected = [
@@ -279,7 +294,12 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     $this->submitForm(['local_export_types[node]' => 'node', 'references' => FALSE], 'Save configuration');
     $this->rebuildAll();
 
-    $this->drupalGet($this->node->toUrl('canonical')->toString() . '/default-content-export');
+    // See the comments in testSingleExportWithReferences() about why this
+    // follows the rendered local task link instead of building the URL,
+    // and why checkForMetaRefresh() is needed after clickLink().
+    $this->drupalGet($this->node->toUrl());
+    $this->clickLink('Export');
+    $this->checkForMetaRefresh();
     $this->assertSession()->statusCodeEquals(200);
 
     $expected = [
@@ -290,6 +310,22 @@ class DefaultContentUiExportTest extends BrowserTestBase {
     ];
 
     $this->verifyExportArchiveOnDisk($expected, $unexpected);
+  }
+
+  /**
+   * Tests that the single-entity export route requires a CSRF token.
+   *
+   * This route runs a batch and writes files on a plain GET — without a
+   * token, a forced request (e.g. an <img> tag on an attacker-controlled
+   * page) from an authenticated privileged user's browser could trigger an
+   * export and clobber their pending download, purely from an unwanted
+   * page visit.
+   */
+  public function testSingleExportRequiresCsrfToken() {
+    $this->drupalLogin($this->adminUser);
+
+    $this->drupalGet($this->node->toUrl('canonical')->toString() . '/default-content-export');
+    $this->assertSession()->statusCodeEquals(403);
   }
 
   /**

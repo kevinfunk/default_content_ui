@@ -45,6 +45,7 @@ class ExportEntityRouteSubscriber extends RouteSubscriberBase {
           [
             '_permission' => 'default content export',
             '_entity_access' => $entity_type_id . '.view',
+            '_csrf_token' => 'TRUE',
           ],
           [
             'parameters' => [
