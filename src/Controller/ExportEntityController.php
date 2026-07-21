@@ -60,7 +60,7 @@ class ExportEntityController extends ControllerBase {
     ];
 
     // Create a root folder.
-    $root_folder = 'temporary://default_content_export_' . time();
+    $root_folder = 'temporary://default_content_export_' . uniqid('', TRUE);
     $this->fileSystem->prepareDirectory($root_folder, FileSystemInterface::CREATE_DIRECTORY);
 
     // Create a 'content' subdirectory for the actual entities.

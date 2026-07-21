@@ -187,7 +187,7 @@ class ExportBulkForm extends ConfigFormBase {
     ];
 
     // Create Root.
-    $root_folder = 'temporary://default_content_export_' . time();
+    $root_folder = 'temporary://default_content_export_' . uniqid('', TRUE);
     $this->fileSystem->prepareDirectory($root_folder, FileSystemInterface::CREATE_DIRECTORY);
 
     // Create Content Subdirectory.

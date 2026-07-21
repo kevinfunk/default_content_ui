@@ -88,7 +88,7 @@ class ImportForm extends FormBase {
     }
 
     $zip_uri = $file->getFileUri();
-    $extract_path = 'temporary://import_extract_' . time();
+    $extract_path = 'temporary://import_extract_' . uniqid('', TRUE);
 
     $batch = [
       'title' => $this->t('Importing Content'),
