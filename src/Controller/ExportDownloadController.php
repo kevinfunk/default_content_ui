@@ -46,19 +46,31 @@ class ExportDownloadController extends FileDownloadController {
     $session = $this->requestStack->getCurrentRequest()->getSession();
     $filename = $session->get('default_content_ui_download');
 
+    if (!$filename) {
+      throw new NotFoundHttpException();
+    }
+
+    $filename = basename($filename);
+
+    if (!file_exists('temporary://' . $filename)) {
+      $session->remove('default_content_ui_download');
+      $session->remove('default_content_ui_download_label');
+      throw new NotFoundHttpException();
+    }
+
+    // The session key is left in place until after download() returns:
+    // hook_file_download() (DefaultContentUiHooks::fileDownload()) checks
+    // it to confirm this download is happening in the same session that
+    // generated the export, not merely by a user who holds the same
+    // permission. Removing it first would make every legitimate download
+    // fail that check too.
+    $request = new Request(['file' => $filename]);
+    $response = $this->download($request, 'temporary');
+
     $session->remove('default_content_ui_download');
     $session->remove('default_content_ui_download_label');
 
-    if ($filename) {
-      $filename = basename($filename);
-
-      if (file_exists('temporary://' . $filename)) {
-        $request = new Request(['file' => $filename]);
-        return $this->download($request, 'temporary');
-      }
-    }
-
-    throw new NotFoundHttpException();
+    return $response;
   }
 
 }

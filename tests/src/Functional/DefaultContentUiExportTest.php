@@ -293,6 +293,58 @@ class DefaultContentUiExportTest extends BrowserTestBase {
   }
 
   /**
+   * Tests that the legitimate auto-download flow still works.
+   */
+  public function testDownloadSucceedsInSameSession() {
+    $this->drupalLogin($this->adminUser);
+    $this->drupalGet('/admin/config/development/default-content/export');
+    $this->submitForm(['bulk_export_types[node]' => 'node', 'references' => FALSE], 'Export Content');
+
+    // submitForm() auto-follows the <meta http-equiv="Refresh"> tag that
+    // DefaultContentUiHooks::pageAttachments() adds, so the download has
+    // already happened (and the session key already consumed) by the time
+    // this assertion runs.
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->responseHeaderContains('Content-Disposition', 'attachment');
+
+    // A second, manual request must not succeed again.
+    $this->drupalGet('/admin/config/development/default-content/export/download');
+    $this->assertSession()->statusCodeEquals(404);
+  }
+
+  /**
+   * Tests that another user cannot fetch someone else's export archive.
+   *
+   * The file_download hook also gates Drupal's public '/system/temporary'
+   * route directly, bypassing ExportDownloadController's own session
+   * check. Export filenames are time()-based, not random, so a permission
+   * check alone would let any other user holding the same 'default
+   * content export' permission download an archive they didn't generate
+   * — one assembled under the *original* exporter's access checks,
+   * potentially disclosing entities the second user can't themselves
+   * view.
+   */
+  public function testDownloadIsScopedToOwningSession() {
+    $this->drupalLogin($this->adminUser);
+    $this->drupalGet('/admin/config/development/default-content/export');
+    $this->submitForm(['bulk_export_types[node]' => 'node', 'references' => FALSE], 'Export Content');
+    $this->assertSession()->statusCodeEquals(200);
+
+    $file_system = \Drupal::service('file_system');
+    $temp_dir = $file_system->realpath('temporary://');
+    $files = glob($temp_dir . '/default_content_export_*.zip');
+    $this->assertNotEmpty($files, 'No export archive found on disk.');
+    usort($files, fn($a, $b) => filemtime($b) - filemtime($a));
+    $filename = basename($files[0]);
+
+    $other_user = $this->drupalCreateUser(['default content export', 'access administration pages']);
+    $this->drupalLogin($other_user);
+
+    $this->drupalGet('/system/temporary', ['query' => ['file' => $filename]]);
+    $this->assertSession()->statusCodeEquals(403);
+  }
+
+  /**
    * Checks the most recent ZIP file in temporary://.
    */
   protected function verifyExportArchiveOnDisk(array $expected_paths, array $unexpected_paths = []) {

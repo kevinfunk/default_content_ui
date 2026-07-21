@@ -96,6 +96,23 @@ class DefaultContentUiHooks {
       if (!$this->currentUser->hasPermission('default content export')) {
         return -1;
       }
+
+      // The permission check above is necessary but not sufficient: this
+      // hook also gates Drupal's public, unauthenticated-reachable
+      // '/system/temporary' route directly, bypassing
+      // ExportDownloadController's own session check entirely. Export
+      // filenames are time()-based, not random, so without also requiring
+      // a matching pending download in *this* session, any other user who
+      // merely holds the same permission could fetch someone else's
+      // already access-scoped export archive by guessing its filename.
+      $request = $this->requestStack->getCurrentRequest();
+      $session = $request && $request->hasSession() ? $request->getSession() : NULL;
+      $expected_filename = $session ? $session->get('default_content_ui_download') : NULL;
+
+      if (!$expected_filename || basename($expected_filename) !== basename($target)) {
+        return -1;
+      }
+
       $filename = basename($target);
       return [
         'Content-disposition' => 'attachment; filename="' . $filename . '"',
