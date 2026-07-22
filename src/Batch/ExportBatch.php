@@ -147,6 +147,9 @@ class ExportBatch {
 
       $context['results']['download_archive'] = $archive_name;
     }
+    else {
+      $context['results']['error'] = 'Could not open Zip archive for writing.';
+    }
 
     try {
       $file_system->deleteRecursive($folder);
@@ -160,7 +163,11 @@ class ExportBatch {
    * Callback for batch completion.
    */
   public static function finished($success, $results, $operations) {
-    if ($success && !empty($results['download_archive'])) {
+    // $success reflects Drupal's own batch processing (e.g. an uncaught
+    // fatal error) and is unrelated to failures this class detects and
+    // handles itself (e.g. compress() failing to open the archive); those
+    // are only visible via $results['error'].
+    if ($success && empty($results['error']) && !empty($results['download_archive'])) {
       $session = \Drupal::request()->getSession();
       $count = $results['count'] ?? 0;
 
@@ -177,8 +184,8 @@ class ExportBatch {
 
       $session->save();
     }
-    elseif (!$success) {
-      \Drupal::messenger()->addError(new TranslatableMarkup('Export failed.'));
+    else {
+      \Drupal::messenger()->addError(new TranslatableMarkup('Export failed: @error', ['@error' => $results['error'] ?? 'Unknown error']));
     }
   }
 
