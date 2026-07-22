@@ -54,7 +54,7 @@ class ExportDownloadController extends FileDownloadController {
 
     if (!file_exists('temporary://' . $filename)) {
       $session->remove('default_content_ui_download');
-      $session->remove('default_content_ui_download_label');
+      $session->remove('default_content_ui_download_message');
       throw new NotFoundHttpException();
     }
 

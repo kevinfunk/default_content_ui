@@ -138,28 +138,17 @@ class DefaultContentUiHooks {
 
       if (empty($filename) || !file_exists('temporary://' . basename($filename))) {
         $session->remove('default_content_ui_download');
-        $session->remove('default_content_ui_download_count');
-        $session->remove('default_content_ui_download_label');
+        $session->remove('default_content_ui_download_message');
         return;
       }
 
-      // Retrieve data passed from ExportBatch::finished.
-      $count = $session->get('default_content_ui_download_count', 0);
-      $label = $session->get('default_content_ui_download_label');
-
-      if ($count > 1) {
-        $this->messenger()->addStatus($this->t('The export archive for @count items is downloading automatically.', ['@count' => $count]));
-      }
-      elseif ($label) {
-        $this->messenger()->addStatus($this->t('The export archive for %label is downloading automatically.', ['%label' => $label]));
-      }
-      else {
-        $this->messenger()->addStatus($this->t('The export archive is downloading automatically.'));
-      }
+      // The message (with the right item count/label already filled in)
+      // is built once, by ExportBatch::finished(), and just displayed here.
+      $message = $session->get('default_content_ui_download_message') ?? $this->t('The export archive is downloading automatically.');
+      $this->messenger()->addStatus($message);
 
       // Cleanup session variables.
-      $session->remove('default_content_ui_download_count');
-      $session->remove('default_content_ui_download_label');
+      $session->remove('default_content_ui_download_message');
 
       // Add the auto-download meta tag.
       $attachments['#attached']['html_head'][] = [
