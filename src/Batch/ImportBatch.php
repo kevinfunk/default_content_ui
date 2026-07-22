@@ -139,7 +139,10 @@ class ImportBatch {
             $file_system->deleteRecursive($item_path);
           }
           catch (\Exception $e) {
-            // Log and ignore.
+            \Drupal::logger('default_content_ui')->warning('Failed to remove invalid folder @path from import archive: @message', [
+              '@path' => $item_path,
+              '@message' => $e->getMessage(),
+            ]);
           }
         }
       }
