@@ -258,6 +258,21 @@ class DefaultContentUiExportTest extends BrowserTestBase {
   }
 
   /**
+   * Tests that the "Export" tab is visible by default on a fresh install.
+   *
+   * SettingsForm's tableselect defaults to "all eligible types enabled"
+   * only when local_export_types is genuinely unset (NULL) — config
+   * install YAML must not ship it as an empty array, which would leave
+   * the "Export" tab hidden until an admin manually visits Settings.
+   */
+  public function testExportTabVisibleByDefaultOnFreshInstall() {
+    $this->drupalLogin($this->adminUser);
+
+    $this->drupalGet($this->node->toUrl());
+    $this->assertSession()->linkExists('Export');
+  }
+
+  /**
    * Test Single Export WITH references.
    */
   public function testSingleExportWithReferences() {

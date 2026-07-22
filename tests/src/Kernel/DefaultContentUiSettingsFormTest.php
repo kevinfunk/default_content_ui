@@ -27,6 +27,21 @@ class DefaultContentUiSettingsFormTest extends KernelTestBase {
   }
 
   /**
+   * Tests that a fresh install leaves local_export_types unset.
+   *
+   * SettingsForm::buildForm() and the code that actually gates the
+   * "Export" tab/operation link (ExportEntityLocalTask,
+   * DefaultContentUiHooks::entityOperation()) both treat NULL as "every
+   * eligible entity type is enabled by default" — but only if this key is
+   * genuinely unset. Shipping it as an empty array in
+   * config/install/default_content_ui.settings.yml would silently enable
+   * nothing until an admin visits Settings.
+   */
+  public function testLocalExportTypesUnsetOnFreshInstall() {
+    $this->assertNull(\Drupal::config('default_content_ui.settings')->get('local_export_types'));
+  }
+
+  /**
    * Tests that a forged, ineligible entity type ID is dropped.
    *
    * Drupal's tableselect element returns whatever keys the client

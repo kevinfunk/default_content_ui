@@ -1,4 +1,2 @@
-bulk_export_types: { }
-local_export_types: { }
 bulk_export_reference_mode: true
 local_export_reference_mode: true

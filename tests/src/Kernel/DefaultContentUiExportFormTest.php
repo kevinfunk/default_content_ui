@@ -27,6 +27,19 @@ class DefaultContentUiExportFormTest extends KernelTestBase {
   }
 
   /**
+   * Tests that a fresh install leaves bulk_export_types unset.
+   *
+   * ExportBulkForm::buildForm() treats NULL as "every content entity type
+   * is checked by default" — but only if this key is genuinely unset.
+   * Shipping it as an empty array in
+   * config/install/default_content_ui.settings.yml would leave every
+   * checkbox unchecked the first time an admin opens the Bulk Export page.
+   */
+  public function testBulkExportTypesUnsetOnFreshInstall() {
+    $this->assertNull(\Drupal::config('default_content_ui.settings')->get('bulk_export_types'));
+  }
+
+  /**
    * Tests that a forged, non-content entity type ID is dropped.
    *
    * Drupal's tableselect element returns whatever keys the client
