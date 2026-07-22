@@ -11,6 +11,7 @@ use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Url;
+use Drupal\default_content_ui\Traits\LocalExportEligibilityTrait;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
@@ -20,6 +21,7 @@ class DefaultContentUiHooks {
 
   use StringTranslationTrait;
   use MessengerTrait;
+  use LocalExportEligibilityTrait;
 
   /**
    * The stream wrapper manager.
@@ -181,7 +183,7 @@ class DefaultContentUiHooks {
       return $operations;
     }
 
-    if ($entity_type->getGroup() === 'content' && $entity->hasLinkTemplate('canonical')) {
+    if ($this->isEligibleForLocalExport($entity_type)) {
       if ($this->currentUser->hasPermission('default content export') && $entity->access('view')) {
         $operations['default_content_export'] = [
           'title' => $this->t('Export'),

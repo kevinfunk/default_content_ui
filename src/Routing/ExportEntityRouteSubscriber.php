@@ -4,6 +4,7 @@ namespace Drupal\default_content_ui\Routing;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Routing\RouteSubscriberBase;
+use Drupal\default_content_ui\Traits\LocalExportEligibilityTrait;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 
@@ -11,6 +12,8 @@ use Symfony\Component\Routing\RouteCollection;
  * Adds export routes for content entities.
  */
 class ExportEntityRouteSubscriber extends RouteSubscriberBase {
+
+  use LocalExportEligibilityTrait;
 
   /**
    * The entity type manager.
@@ -34,7 +37,7 @@ class ExportEntityRouteSubscriber extends RouteSubscriberBase {
    */
   protected function alterRoutes(RouteCollection $collection) {
     foreach ($this->entityTypeManager->getDefinitions() as $entity_type_id => $entity_type) {
-      if ($entity_type->getGroup() === 'content' && $entity_type->hasLinkTemplate('canonical')) {
+      if ($this->isEligibleForLocalExport($entity_type)) {
         $route = new Route(
           $entity_type->getLinkTemplate('canonical') . '/default-content-export',
           [

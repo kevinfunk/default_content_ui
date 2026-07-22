@@ -7,6 +7,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Plugin\Discovery\ContainerDeriverInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\default_content_ui\Traits\LocalExportEligibilityTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -15,6 +16,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class ExportEntityLocalTask extends DeriverBase implements ContainerDeriverInterface {
 
   use StringTranslationTrait;
+  use LocalExportEligibilityTrait;
 
   /**
    * The entity type manager.
@@ -62,7 +64,7 @@ class ExportEntityLocalTask extends DeriverBase implements ContainerDeriverInter
     foreach ($this->entityTypeManager->getDefinitions() as $entity_type_id => $entity_type) {
       $is_enabled = is_null($enabled_types) || in_array($entity_type_id, $enabled_types);
 
-      if ($is_enabled && $entity_type->getGroup() === 'content' && $entity_type->hasLinkTemplate('canonical')) {
+      if ($is_enabled && $this->isEligibleForLocalExport($entity_type)) {
         $this->derivatives[$entity_type_id] = [
           'route_name' => "entity.$entity_type_id.default_content_export",
           'title' => $this->t('Export'),
