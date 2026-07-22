@@ -147,4 +147,48 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
     $this->assertSame(0, $context['results']['count'] ?? 0, 'A failed export must not be counted as succeeded.');
   }
 
+  /**
+   * Tests that export() correctly processes entities across multiple chunks.
+   *
+   * ExportBatch::export() processes up to 10 entities per call, tracking
+   * a cursor ($context['sandbox']['current_id']) across repeated calls — every
+   * existing test exports 3 or fewer entities, so this multi-call
+   * pagination logic (and the finished-ratio calculation) has never
+   * actually been exercised past a single chunk. A cursor bug here would
+   * silently drop or duplicate entities on any real-world bulk export.
+   */
+  public function testExportProcessesAllEntitiesAcrossMultipleChunks() {
+    $expected_uuids = [];
+    for ($i = 0; $i < 25; $i++) {
+      $node = Node::create(['type' => 'page', 'title' => "Node $i"]);
+      $node->save();
+      $expected_uuids[] = $node->uuid();
+    }
+    sort($expected_uuids);
+
+    $folder = 'temporary://dcu_test_multi_chunk_' . $this->randomMachineName();
+    \Drupal::service('file_system')->prepareDirectory($folder, FileSystemInterface::CREATE_DIRECTORY);
+
+    $context = [];
+    $calls = 0;
+    do {
+      ExportBatch::export('node', $folder, 'entity', $context);
+      $calls++;
+    } while (empty($context['finished']) || $context['finished'] < 1);
+
+    // With a chunk size of 10, exporting 25 entities must take multiple
+    // calls — proving this test actually exercises the multi-chunk
+    // cursor, not just a single pass.
+    $this->assertGreaterThan(1, $calls);
+    $this->assertSame(25, $context['results']['count']);
+
+    $exported_uuids = [];
+    foreach (glob(\Drupal::service('file_system')->realpath($folder) . '/node/*.yml') as $file) {
+      $exported_uuids[] = basename($file, '.yml');
+    }
+    sort($exported_uuids);
+
+    $this->assertSame($expected_uuids, $exported_uuids, 'Every entity must be exported exactly once, with none dropped or duplicated.');
+  }
+
 }
