@@ -7,6 +7,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Messenger\MessengerTrait;
+use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -197,6 +198,37 @@ class DefaultContentUiHooks {
     }
 
     return $operations;
+  }
+
+  /**
+   * Implements hook_help().
+   */
+  #[Hook('help')]
+  public function help($route_name, RouteMatchInterface $route_match) {
+    switch ($route_name) {
+      case 'help.page.default_content_ui':
+        $output = '';
+        $output .= '<h3>' . $this->t('About') . '</h3>';
+        $output .= '<p>' . $this->t("The Default Content UI module provides an administrative interface around Drupal core's Default Content system, for moving content between environments as portable ZIP archives.") . '</p>';
+
+        $output .= '<h3>' . $this->t('Features') . '</h3>';
+        $output .= '<ul>';
+        $output .= '<li>' . $this->t('<strong>Single-Entity Export</strong>: An "Export" tab and operation link on individual content items, configurable per entity type in <a href=":url">Settings</a>.', [':url' => Url::fromRoute('default_content_ui.settings')->toString()]) . '</li>';
+        $output .= '<li>' . $this->t('<strong>Bulk Export</strong>: Export all content of one or more entity types at once.') . '</li>';
+        $output .= '<li>' . $this->t('<strong>Views Bulk Action</strong>: An "Export Default Content" action for use in Views with a bulk operations field.') . '</li>';
+        $output .= '<li>' . $this->t('<strong>Import</strong>: Upload a previously exported ZIP archive to recreate its content. Entities whose UUID already exists on the site are skipped, never overwritten.') . '</li>';
+        $output .= '</ul>';
+
+        $output .= '<h3>' . $this->t('Uses') . '</h3>';
+        $output .= '<dl>';
+        $output .= '<dt>' . $this->t('Exporting Content') . '</dt>';
+        $output .= '<dd>' . $this->t('Use the <a href=":url">Export Content</a> page for a bulk export, or the "Export" tab/link on an individual entity for a single-entity export.', [':url' => Url::fromRoute('default_content_ui.export_bulk')->toString()]) . '</dd>';
+        $output .= '<dt>' . $this->t('Importing Content') . '</dt>';
+        $output .= '<dd>' . $this->t('Use the <a href=":url">Import Content</a> page to upload a ZIP archive.', [':url' => Url::fromRoute('default_content_ui.import')->toString()]) . '</dd>';
+        $output .= '</dl>';
+
+        return ['#markup' => $output];
+    }
   }
 
 }
