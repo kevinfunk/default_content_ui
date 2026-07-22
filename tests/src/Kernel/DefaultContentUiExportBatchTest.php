@@ -6,9 +6,11 @@ use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\default_content_ui\Batch\ExportBatch;
 use Drupal\KernelTests\KernelTestBase;
+use Drupal\node\Entity\Node;
+use Drupal\node\Entity\NodeType;
 
 /**
- * Tests ExportBatch's batch-completion messaging.
+ * Tests ExportBatch's batch-completion messaging and per-item resilience.
  *
  * @group default_content_ui
  */
@@ -17,7 +19,18 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = ['default_content_ui', 'system', 'user', 'file'];
+  protected static $modules = ['default_content_ui', 'system', 'user', 'file', 'node', 'field', 'text'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp(): void {
+    parent::setUp();
+    $this->installEntitySchema('node');
+    $this->installEntitySchema('user');
+    $this->installConfig(['node', 'field']);
+    NodeType::create(['type' => 'page', 'name' => 'Page'])->save();
+  }
 
   /**
    * Tests that a compress() failure produces a real error message.
@@ -101,6 +114,37 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
     $this->assertStringContainsString('The export archive for', $rendered);
     $this->assertStringContainsString('Test Page with Dependency', $rendered);
     $this->assertStringContainsString('is downloading automatically.', $rendered);
+  }
+
+  /**
+   * Tests that a per-entity export failure doesn't abort the whole chunk.
+   *
+   * ExportBatch::export() previously had no try/catch around the export call,
+   * unlike ImportBatch::import()'s equivalent core-API call, so one bad
+   * entity would propagate an uncaught exception and abort exporting the
+   * rest of the chunk (and any later chunks). Pointing the destination at
+   * a path that is itself a plain file (not a directory) reliably
+   * reproduces a real Exporter\DirectoryNotReadyException without needing
+   * to fabricate a broken entity.
+   */
+  public function testExportCatchesFailureAndAdvancesCursor() {
+    $node = Node::create(['type' => 'page', 'title' => 'Test']);
+    $node->save();
+
+    $blocked_folder = 'temporary://dcu_test_blocked_dir';
+    \Drupal::service('file_system')->saveData('not a directory', $blocked_folder, FileSystemInterface::EXISTS_REPLACE);
+
+    $context = [];
+    ExportBatch::export('node', $blocked_folder, 'entity', $context);
+
+    // Reaching this line at all proves the exception was caught rather
+    // than propagated as an uncaught fatal.
+    $this->assertSame(
+      $node->id(),
+      $context['sandbox']['current_id'],
+      'The cursor must advance past a failing entity, or the next batch call would retry it forever.'
+    );
+    $this->assertSame(0, $context['results']['count'] ?? 0, 'A failed export must not be counted as succeeded.');
   }
 
 }

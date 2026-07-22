@@ -51,23 +51,36 @@ class ExportBatch {
     $include_dependencies = ($mode === 'references');
 
     foreach ($entities as $entity) {
-      if ($include_dependencies) {
-        $exporter->exportWithDependencies($entity, $folder);
+      try {
+        if ($include_dependencies) {
+          $exporter->exportWithDependencies($entity, $folder);
+        }
+        else {
+          $exporter->exportToFile($entity, $folder);
+        }
+
+        // Allow other modules to add related files to the folder.
+        \Drupal::moduleHandler()->invokeAll('default_content_ui_export_entity', [$entity, $folder]);
+
+        if (!isset($context['results']['count'])) {
+          $context['results']['count'] = 0;
+        }
+        $context['results']['count']++;
       }
-      else {
-        $exporter->exportToFile($entity, $folder);
+      catch (\Exception $e) {
+        // Logged and skipped, not rethrown, so one bad entity doesn't
+        // abort exporting the rest of this chunk (or later chunks).
+        \Drupal::logger('default_content_ui')->error('Failed to export @type @id: @message', [
+          '@type' => $entity_type,
+          '@id' => $entity->id(),
+          '@message' => $e->getMessage(),
+        ]);
       }
 
-      // Allow other modules to add related files to the folder.
-      \Drupal::moduleHandler()->invokeAll('default_content_ui_export_entity', [$entity, $folder]);
-
+      // Always advance the cursor, even on failure — otherwise the next
+      // batch call would refetch the same failing entity forever.
       $context['sandbox']['progress']++;
       $context['sandbox']['current_id'] = $entity->id();
-
-      if (!isset($context['results']['count'])) {
-        $context['results']['count'] = 0;
-      }
-      $context['results']['count']++;
     }
 
     if ($context['sandbox']['max'] > 0) {
@@ -91,24 +104,35 @@ class ExportBatch {
     /** @var \Drupal\Core\DefaultContent\Exporter $exporter */
     $exporter = \Drupal::service(Exporter::class);
 
-    if (!isset($context['results']['count'])) {
-      $context['results']['count'] = 0;
-    }
-    $context['results']['count']++;
+    try {
+      if ($mode === 'references') {
+        $exporter->exportWithDependencies($entity, $folder);
+      }
+      else {
+        $exporter->exportToFile($entity, $folder);
+      }
 
-    if (empty($context['results']['single_label'])) {
-      $context['results']['single_label'] = $entity->label();
-    }
+      // Allow other modules to add related files to the folder.
+      \Drupal::moduleHandler()->invokeAll('default_content_ui_export_entity', [$entity, $folder]);
 
-    if ($mode === 'references') {
-      $exporter->exportWithDependencies($entity, $folder);
-    }
-    else {
-      $exporter->exportToFile($entity, $folder);
-    }
+      if (!isset($context['results']['count'])) {
+        $context['results']['count'] = 0;
+      }
+      $context['results']['count']++;
 
-    // Allow other modules to add related files to the folder.
-    \Drupal::moduleHandler()->invokeAll('default_content_ui_export_entity', [$entity, $folder]);
+      if (empty($context['results']['single_label'])) {
+        $context['results']['single_label'] = $entity->label();
+      }
+    }
+    catch (\Exception $e) {
+      // Logged and skipped, not rethrown, so one bad entity doesn't abort
+      // the rest of a multi-entity selection's batch.
+      \Drupal::logger('default_content_ui')->error('Failed to export @type @id: @message', [
+        '@type' => $entity_type_id,
+        '@id' => $id,
+        '@message' => $e->getMessage(),
+      ]);
+    }
   }
 
   /**
