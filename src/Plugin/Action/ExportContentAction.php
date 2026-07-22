@@ -11,6 +11,7 @@ use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\default_content_ui\Batch\ExportBatch;
+use Drupal\default_content_ui\Traits\ExportBatchSkeletonTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -24,6 +25,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
   deriver: 'Drupal\default_content_ui\Plugin\Derivative\ExportActionDeriver'
 )]
 class ExportContentAction extends ActionBase implements ContainerFactoryPluginInterface {
+
+  use ExportBatchSkeletonTrait;
 
   /**
    * The config factory.
@@ -101,21 +104,10 @@ class ExportContentAction extends ActionBase implements ContainerFactoryPluginIn
     $include_dependencies = $config->get('local_export_reference_mode') ?? TRUE;
     $mode = $include_dependencies ? 'references' : 'entity';
 
-    $batch = [
-      'title' => $this->t('Exporting Selected Content'),
-      'operations' => [
-        [[ExportBatch::class, 'start'], []],
-      ],
-      'finished' => [ExportBatch::class, 'finished'],
-    ];
-
-    // Create Root.
-    $root_folder = 'temporary://default_content_export_' . uniqid('', TRUE);
-    $this->fileSystem->prepareDirectory($root_folder, FileSystemInterface::CREATE_DIRECTORY);
-
-    // Create Content Subdirectory.
-    $content_folder = $root_folder . '/content';
-    $this->fileSystem->prepareDirectory($content_folder, FileSystemInterface::CREATE_DIRECTORY);
+    $skeleton = $this->createExportBatchSkeleton($this->t('Exporting Selected Content'));
+    $batch = $skeleton['batch'];
+    $content_folder = $skeleton['content_folder'];
+    $root_folder = $skeleton['root_folder'];
 
     foreach ($entities as $entity) {
       $batch['operations'][] = [

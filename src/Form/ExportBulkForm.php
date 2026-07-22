@@ -9,12 +9,15 @@ use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\default_content_ui\Batch\ExportBatch;
+use Drupal\default_content_ui\Traits\ExportBatchSkeletonTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Implements the Bulk Export form.
  */
 class ExportBulkForm extends ConfigFormBase {
+
+  use ExportBatchSkeletonTrait;
 
   /**
    * The entity type manager.
@@ -178,21 +181,10 @@ class ExportBulkForm extends ConfigFormBase {
 
     $mode = $reference_mode ? 'references' : 'entity';
 
-    $batch = [
-      'title' => $this->t('Exporting Content'),
-      'operations' => [
-        [[ExportBatch::class, 'start'], []],
-      ],
-      'finished' => [ExportBatch::class, 'finished'],
-    ];
-
-    // Create Root.
-    $root_folder = 'temporary://default_content_export_' . uniqid('', TRUE);
-    $this->fileSystem->prepareDirectory($root_folder, FileSystemInterface::CREATE_DIRECTORY);
-
-    // Create Content Subdirectory.
-    $content_folder = $root_folder . '/content';
-    $this->fileSystem->prepareDirectory($content_folder, FileSystemInterface::CREATE_DIRECTORY);
+    $skeleton = $this->createExportBatchSkeleton($this->t('Exporting Content'));
+    $batch = $skeleton['batch'];
+    $content_folder = $skeleton['content_folder'];
+    $root_folder = $skeleton['root_folder'];
 
     foreach ($enabled_types as $entity_type) {
       $batch['operations'][] = [
