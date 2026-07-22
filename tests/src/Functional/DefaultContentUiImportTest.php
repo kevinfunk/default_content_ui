@@ -160,6 +160,57 @@ class DefaultContentUiImportTest extends BrowserTestBase {
   }
 
   /**
+   * Tests that malformed YAML in an otherwise-valid archive fails gracefully.
+   *
+   * ImportBatch::import()'s core-API call was never exercised against a
+   * syntactically-broken entity file alongside a valid one. Confirmed
+   * behavior: the malformed file aborts the whole import (not a partial
+   * success) with a clear "Import failed: ..." message rather than an
+   * uncaught exception / white screen — this locks that in.
+   */
+  public function testImportHandlesMalformedYamlGracefully() {
+    $admin_user = $this->drupalCreateUser([
+      'default content import',
+      'access administration pages',
+    ]);
+    $this->drupalLogin($admin_user);
+
+    // Export one real, valid node.
+    $node = $this->drupalCreateNode(['type' => 'page', 'title' => 'Valid Node']);
+    $uuid = $node->uuid();
+
+    /** @var \Drupal\Core\DefaultContent\Exporter $exporter */
+    $exporter = \Drupal::service(Exporter::class);
+    $file_system = \Drupal::service('file_system');
+    $export_dir = $file_system->realpath('temporary://test_export_source_malformed');
+    $file_system->mkdir($export_dir);
+    $exporter->exportToFile($node, $export_dir);
+    $node->delete();
+
+    $zip_path = $file_system->realpath('temporary://test_malformed_yaml.zip');
+    $zip = new \ZipArchive();
+    $zip->open($zip_path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+    $zip->addFile($export_dir . '/node/' . $uuid . '.yml', 'content/node/' . $uuid . '.yml');
+    // Alongside it, a syntactically invalid YAML file.
+    $zip->addFromString('content/node/11111111-1111-1111-1111-111111111111.yml', "_meta:\n  entity_type: node\ndefault:\n  title: [unclosed");
+    $zip->close();
+
+    $this->drupalGet('/admin/config/development/default-content/import');
+    $this->submitForm(['files[archive]' => $zip_path], 'Import Content');
+
+    // The site must not white-screen, and the admin must see a clear
+    // failure message rather than a silent or ambiguous result.
+    $this->assertSession()->statusCodeEquals(200);
+    $this->assertSession()->pageTextContains('Import failed');
+
+    // A malformed file elsewhere in the archive must abort the whole
+    // import, not partially succeed — the otherwise-valid node must not
+    // have been created.
+    $imported_node = \Drupal::service('entity.repository')->loadEntityByUuid('node', $uuid);
+    $this->assertNull($imported_node, 'A malformed file elsewhere in the archive must abort the whole import.');
+  }
+
+  /**
    * Tests that an archive with too many entries is rejected.
    */
   public function testImportRejectsTooManyFiles() {
