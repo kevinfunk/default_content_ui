@@ -1,0 +1,26 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the Default Content UI module.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function default_content_ui_uninstall() {
+  $file_system = \Drupal::service('file_system');
+  $temp_dir = $file_system->realpath('temporary://');
+  if (!$temp_dir) {
+    return;
+  }
+
+  foreach (glob($temp_dir . '/default_content_export_*') as $path) {
+    if (is_dir($path)) {
+      $file_system->deleteRecursive($path);
+    }
+    else {
+      @unlink($path);
+    }
+  }
+}
