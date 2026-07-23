@@ -1,9 +1,9 @@
 default content import:
-  description: 'Allows user to import exported content via UI. It will overwrite existing content.'
+  description: 'Allows users to import content from an uploaded ZIP archive via UI. Content whose UUID already exists on the site is skipped, not overwritten.'
   title: 'Import content'
   restrict access: TRUE
 
 default content export:
-  description: 'Allows user to export content via UI.'
+  description: 'Allows users to export content to a ZIP archive via UI.'
   title: 'Export content'
   restrict access: TRUE

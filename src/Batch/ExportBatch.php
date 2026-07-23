@@ -209,7 +209,9 @@ class ExportBatch {
       $session->save();
     }
     else {
-      \Drupal::messenger()->addError(new TranslatableMarkup('Export failed: @error', ['@error' => $results['error'] ?? 'Unknown error']));
+      $error = $results['error'] ?? 'Unknown error';
+      \Drupal::logger('default_content_ui')->error('Content export failed: @error', ['@error' => $error]);
+      \Drupal::messenger()->addError(new TranslatableMarkup('Export failed: @error', ['@error' => $error]));
     }
   }
 

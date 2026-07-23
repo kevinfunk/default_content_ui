@@ -173,7 +173,9 @@ class ImportBatch {
       \Drupal::messenger()->addStatus(new TranslatableMarkup('Content import completed successfully.'));
     }
     else {
-      \Drupal::messenger()->addError(new TranslatableMarkup('Import failed: @error', ['@error' => $results['error'] ?? 'Unknown error']));
+      $error = $results['error'] ?? 'Unknown error';
+      \Drupal::logger('default_content_ui')->error('Content import failed: @error', ['@error' => $error]);
+      \Drupal::messenger()->addError(new TranslatableMarkup('Import failed: @error', ['@error' => $error]));
     }
 
     if (!empty($results['extract_path'])) {

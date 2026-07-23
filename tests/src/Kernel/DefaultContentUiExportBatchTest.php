@@ -19,7 +19,7 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected static $modules = ['default_content_ui', 'system', 'user', 'file', 'node', 'field', 'text'];
+  protected static $modules = ['default_content_ui', 'system', 'user', 'file', 'node', 'field', 'text', 'dblog'];
 
   /**
    * {@inheritdoc}
@@ -29,6 +29,7 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
     $this->installEntitySchema('node');
     $this->installEntitySchema('user');
     $this->installConfig(['node', 'field']);
+    $this->installSchema('dblog', ['watchdog']);
     NodeType::create(['type' => 'page', 'name' => 'Page'])->save();
   }
 
@@ -49,6 +50,27 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
     $errors = \Drupal::messenger()->messagesByType(MessengerInterface::TYPE_ERROR);
     $this->assertNotEmpty($errors, 'An error message is shown when the archive could not be created.');
     $this->assertStringContainsString('Could not open Zip archive for writing.', (string) reset($errors));
+  }
+
+  /**
+   * Tests that an overall export failure is also logged to watchdog.
+   *
+   * Previously only shown via a messenger error, which leaves no
+   * server-side record once the admin dismisses it or if it's ever
+   * triggered outside an interactive session.
+   */
+  public function testFinishedLogsErrorToWatchdog() {
+    ExportBatch::finished(TRUE, ['error' => 'Could not open Zip archive for writing.'], []);
+
+    $log = \Drupal::database()->select('watchdog', 'w')
+      ->fields('w', ['message', 'variables'])
+      ->condition('type', 'default_content_ui')
+      ->execute()
+      ->fetchAll();
+
+    $this->assertCount(1, $log, 'The export failure is recorded in the log.');
+    $variables = unserialize($log[0]->variables, ['allowed_classes' => FALSE]);
+    $this->assertStringContainsString('Could not open Zip archive for writing.', $variables['@error']);
   }
 
   /**
