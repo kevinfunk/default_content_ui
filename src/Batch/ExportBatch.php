@@ -24,8 +24,6 @@ class ExportBatch {
    * Batch callback to export a chunk of entities.
    */
   public static function export($entity_type, $folder, $mode, &$context) {
-    /** @var \Drupal\Core\DefaultContent\Exporter $exporter */
-    $exporter = \Drupal::service(Exporter::class);
     $storage = \Drupal::entityTypeManager()->getStorage($entity_type);
 
     if (!isset($context['sandbox']['progress'])) {
@@ -48,34 +46,9 @@ class ExportBatch {
     }
 
     $entities = $storage->loadMultiple($ids);
-    $include_dependencies = ($mode === 'references');
 
     foreach ($entities as $entity) {
-      try {
-        if ($include_dependencies) {
-          $exporter->exportWithDependencies($entity, $folder);
-        }
-        else {
-          $exporter->exportToFile($entity, $folder);
-        }
-
-        // Allow other modules to add related files to the folder.
-        \Drupal::moduleHandler()->invokeAll('default_content_ui_export_entity', [$entity, $folder]);
-
-        if (!isset($context['results']['count'])) {
-          $context['results']['count'] = 0;
-        }
-        $context['results']['count']++;
-      }
-      catch (\Exception $e) {
-        // Logged and skipped, not rethrown, so one bad entity doesn't
-        // abort exporting the rest of this chunk (or later chunks).
-        \Drupal::logger('default_content_ui')->error('Failed to export @type @id: @message', [
-          '@type' => $entity_type,
-          '@id' => $entity->id(),
-          '@message' => $e->getMessage(),
-        ]);
-      }
+      self::exportOneEntity($entity, $mode, $folder, $context);
 
       // Always advance the cursor, even on failure — otherwise the next
       // batch call would refetch the same failing entity forever.
@@ -101,6 +74,24 @@ class ExportBatch {
       return;
     }
 
+    if (self::exportOneEntity($entity, $mode, $folder, $context) && empty($context['results']['single_label'])) {
+      $context['results']['single_label'] = $entity->label();
+    }
+  }
+
+  /**
+   * Exports one entity and records it in the batch results.
+   *
+   * Shared by export() (the chunked/multi-entity batch path) and
+   * exportSingle(), so the actual export step, the
+   * default_content_ui_export_entity hook invocation, the result count,
+   * and the failure handling can never drift apart between the two.
+   *
+   * @return bool
+   *   TRUE if the entity was exported successfully, FALSE if it failed
+   *   (already logged) and was skipped.
+   */
+  protected static function exportOneEntity($entity, $mode, $folder, array &$context): bool {
     /** @var \Drupal\Core\DefaultContent\Exporter $exporter */
     $exporter = \Drupal::service(Exporter::class);
 
@@ -120,18 +111,17 @@ class ExportBatch {
       }
       $context['results']['count']++;
 
-      if (empty($context['results']['single_label'])) {
-        $context['results']['single_label'] = $entity->label();
-      }
+      return TRUE;
     }
     catch (\Exception $e) {
       // Logged and skipped, not rethrown, so one bad entity doesn't abort
-      // the rest of a multi-entity selection's batch.
+      // exporting the rest of this chunk or selection.
       \Drupal::logger('default_content_ui')->error('Failed to export @type @id: @message', [
-        '@type' => $entity_type_id,
-        '@id' => $id,
+        '@type' => $entity->getEntityTypeId(),
+        '@id' => $entity->id(),
         '@message' => $e->getMessage(),
       ]);
+      return FALSE;
     }
   }
 
