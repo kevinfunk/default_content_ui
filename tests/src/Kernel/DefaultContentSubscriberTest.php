@@ -125,4 +125,42 @@ class DefaultContentSubscriberTest extends KernelTestBase {
     $this->assertArrayNotHasKey('field_composite_reference', $result->data['default']);
   }
 
+  /**
+   * Tests that host-tracking fields are excluded from the child's export.
+   *
+   * The entity_test_composite entity type (like Cohesion's
+   * cohesion_layout) declares parent_id/parent_type/parent_field_name as
+   * its entity_revision_parent_*_field annotations. These store a raw,
+   * site-specific numeric host ID — exporting them as-is would make the
+   * imported entity "hosted" by whatever unrelated entity happens to
+   * have that numeric ID on the destination site.
+   */
+  public function testHostTrackingFieldsAreExcludedFromExport() {
+    $referenced = EntityTestCompositeRelationship::create(['name' => 'Referenced entity']);
+    $referenced->save();
+
+    $node = Node::create([
+      'type' => 'article',
+      'title' => 'Host node',
+      'field_composite_reference' => $referenced,
+    ]);
+    $node->save();
+
+    // Saving the host node above triggers
+    // EntityReferenceRevisionsItem::postSave(), which populates
+    // parent_id/parent_type on the referenced entity to point back at
+    // its host — reload to see the real, now-populated values.
+    $storage = \Drupal::entityTypeManager()->getStorage('entity_test_composite');
+    $storage->resetCache([$referenced->id()]);
+    $referenced = $storage->load($referenced->id());
+    $this->assertEquals($node->id(), $referenced->get('parent_id')->value);
+    $this->assertSame('node', $referenced->get('parent_type')->value);
+
+    $result = \Drupal::service(Exporter::class)->export($referenced);
+
+    $this->assertArrayNotHasKey('parent_id', $result->data['default']);
+    $this->assertArrayNotHasKey('parent_type', $result->data['default']);
+    $this->assertArrayNotHasKey('parent_field_name', $result->data['default']);
+  }
+
 }

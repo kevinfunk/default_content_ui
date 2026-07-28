@@ -57,6 +57,7 @@ class DefaultContentSubscriber implements EventSubscriberInterface {
   public function onPreExport(PreExportEvent $event): void {
     $this->stripInvalidTargetUuid($event);
     $this->registerEntityReferenceRevisionsCallbacks($event);
+    $this->excludeHostTrackingFields($event);
   }
 
   /**
@@ -184,6 +185,31 @@ class DefaultContentSubscriber implements EventSubscriberInterface {
       }
     }
     return $this->entityReferenceRevisionsFieldTypeIds;
+  }
+
+  /**
+   * Excludes entity_reference_revisions host-tracking fields from export.
+   *
+   * A composite entity's entity_revision_parent_*_field annotations
+   * (e.g. a Cohesion layout's parent_id) store a raw, site-specific
+   * numeric host ID — not portable, and not necessary to export:
+   * EntityReferenceRevisionsItem::postSave() re-derives them
+   * automatically whenever the real host entity is saved, which happens
+   * the moment it's imported.
+   */
+  protected function excludeHostTrackingFields(PreExportEvent $event): void {
+    $entity_type = $event->entity->getEntityType();
+    $annotations = [
+      'entity_revision_parent_id_field',
+      'entity_revision_parent_type_field',
+      'entity_revision_parent_field_name_field',
+    ];
+    foreach ($annotations as $annotation) {
+      $field_name = $entity_type->get($annotation);
+      if ($field_name) {
+        $event->setExportable($field_name, FALSE);
+      }
+    }
   }
 
 }
