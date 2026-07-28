@@ -17,5 +17,6 @@ services:
 
   default_content_ui.subscriber:
     class: Drupal\default_content_ui\EventSubscriber\DefaultContentSubscriber
+    arguments: ['@plugin.manager.field.field_type']
     tags:
       - { name: event_subscriber }
