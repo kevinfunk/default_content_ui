@@ -18,6 +18,7 @@ class ExportBatch {
     $context['results']['download_archive'] = NULL;
     $context['results']['single_label'] = NULL;
     $context['results']['count'] = 0;
+    $context['results']['attempted'] = 0;
   }
 
   /**
@@ -95,6 +96,11 @@ class ExportBatch {
     /** @var \Drupal\Core\DefaultContent\Exporter $exporter */
     $exporter = \Drupal::service(Exporter::class);
 
+    if (!isset($context['results']['attempted'])) {
+      $context['results']['attempted'] = 0;
+    }
+    $context['results']['attempted']++;
+
     try {
       if ($mode === 'references') {
         $exporter->exportWithDependencies($entity, $folder);
@@ -132,6 +138,17 @@ class ExportBatch {
     /** @var \Drupal\Core\File\FileSystemInterface $file_system */
     $file_system = \Drupal::service('file_system');
 
+    // Without this check, a total export failure (every entity's
+    // exportOneEntity() call threw) still zipped up the empty/partial
+    // folder and set download_archive, so finished() reported success
+    // and auto-downloaded a broken archive instead of surfacing the
+    // failure that's otherwise only visible in the watchdog log.
+    if (empty($context['results']['count'])) {
+      $context['results']['error'] = 'No entities were successfully exported.';
+      self::cleanupFolder($file_system, $folder);
+      return;
+    }
+
     $sys_temp = sys_get_temp_dir();
     $archive_name = basename($folder) . '.zip';
     $zip_path = $file_system->tempnam($sys_temp, 'dcu_export_');
@@ -165,6 +182,13 @@ class ExportBatch {
       $context['results']['error'] = 'Could not open Zip archive for writing.';
     }
 
+    self::cleanupFolder($file_system, $folder);
+  }
+
+  /**
+   * Deletes the temporary export folder, logging (not throwing) on failure.
+   */
+  protected static function cleanupFolder(FileSystemInterface $file_system, string $folder): void {
     try {
       $file_system->deleteRecursive($folder);
     }
@@ -195,6 +219,19 @@ class ExportBatch {
 
       $session->set('default_content_ui_download', $results['download_archive']);
       $session->set('default_content_ui_download_message', $message);
+
+      // count() being 0 is already caught in compress() (it refuses to
+      // produce a download at all); this covers the softer case where
+      // some, but not all, of the selected entities failed — otherwise
+      // that's visible only in the watchdog log, and the success message
+      // above would be the only thing the admin ever sees.
+      $attempted = $results['attempted'] ?? $count;
+      if ($attempted > $count) {
+        \Drupal::messenger()->addWarning(new TranslatableMarkup('@failed of @attempted selected items could not be exported and were skipped; see the logs for details.', [
+          '@failed' => $attempted - $count,
+          '@attempted' => $attempted,
+        ]));
+      }
 
       $session->save();
     }

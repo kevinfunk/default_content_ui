@@ -139,6 +139,60 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
   }
 
   /**
+   * Tests that compress() refuses to produce a download when count is 0.
+   *
+   * Previously compress() zipped up whatever was in the folder (empty,
+   * on a total export failure) and always set 'download_archive' as
+   * long as ZipArchive::open() itself succeeded — finished() then saw a
+   * populated 'download_archive' and no 'error', so it reported success
+   * and auto-downloaded a broken/empty archive instead of surfacing the
+   * failure that was otherwise only visible in the watchdog log.
+   */
+  public function testCompressRefusesToProduceDownloadWhenNothingExported() {
+    $folder = 'temporary://dcu_test_empty_export_' . $this->randomMachineName();
+    \Drupal::service('file_system')->prepareDirectory($folder, FileSystemInterface::CREATE_DIRECTORY);
+
+    $context = ['results' => ['count' => 0]];
+    ExportBatch::compress($folder, $context);
+
+    $this->assertArrayHasKey('error', $context['results'], 'A zero-count export must be surfaced as an error.');
+    $this->assertEmpty($context['results']['download_archive'] ?? NULL, 'No download must be offered when nothing was exported.');
+  }
+
+  /**
+   * Tests that a partial export failure produces a warning message.
+   *
+   * Previously the only trace of a partial failure (some, but not all,
+   * selected entities failed) was a watchdog log entry — the admin saw
+   * only the success message for whatever did export, with no
+   * indication anything was silently skipped.
+   */
+  public function testFinishedWarnsAboutPartialFailure() {
+    ExportBatch::finished(TRUE, [
+      'download_archive' => 'default_content_export_partial_test.zip',
+      'count' => 3,
+      'attempted' => 5,
+    ], []);
+
+    $warnings = \Drupal::messenger()->messagesByType(MessengerInterface::TYPE_WARNING);
+    $this->assertNotEmpty($warnings, 'A warning is shown when some selected items failed to export.');
+    $this->assertStringContainsString('2 of 5', (string) reset($warnings));
+  }
+
+  /**
+   * Tests that a fully successful export does not also report a warning.
+   */
+  public function testFinishedDoesNotWarnWhenAllSucceeded() {
+    ExportBatch::finished(TRUE, [
+      'download_archive' => 'default_content_export_full_test.zip',
+      'count' => 3,
+      'attempted' => 3,
+    ], []);
+
+    $this->assertEmpty(\Drupal::messenger()->messagesByType(MessengerInterface::TYPE_WARNING));
+  }
+
+  /**
    * Tests that a per-entity export failure doesn't abort the whole chunk.
    *
    * ExportBatch::export() previously had no try/catch around the export call,
