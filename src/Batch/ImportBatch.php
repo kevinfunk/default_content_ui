@@ -5,6 +5,7 @@ namespace Drupal\default_content_ui\Batch;
 use Drupal\Core\DefaultContent\Existing;
 use Drupal\Core\DefaultContent\Finder;
 use Drupal\Core\DefaultContent\Importer;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\file\Entity\File;
 
@@ -84,6 +85,31 @@ class ImportBatch {
   }
 
   /**
+   * Resolves the real archive root, unwrapping an accidental wrapper folder.
+   *
+   * A single top-level entry is only unwrapped if it isn't a meaningful
+   * name — 'content', 'components', or a real content entity type —
+   * otherwise a legitimately single-folder archive would have that folder
+   * wrongly unwrapped, hiding any sibling that should sit alongside it.
+   */
+  protected static function resolveArchiveRoot(string $folder, EntityTypeManagerInterface $entity_type_manager): string {
+    $scan = scandir($folder);
+    $candidates = array_diff($scan, ['.', '..', '__MACOSX']);
+    if (count($candidates) !== 1) {
+      return $folder;
+    }
+
+    $subdir = reset($candidates);
+    $is_meaningful_name = in_array($subdir, ['content', 'components'], TRUE)
+      || ($entity_type_manager->hasDefinition($subdir) && $entity_type_manager->getDefinition($subdir)->getGroup() === 'content');
+
+    if (!$is_meaningful_name && is_dir($folder . '/' . $subdir)) {
+      return $folder . '/' . $subdir;
+    }
+    return $folder;
+  }
+
+  /**
    * Imports content from the extracted folder.
    */
   public static function import($folder, &$context) {
@@ -104,14 +130,7 @@ class ImportBatch {
 
     $entity_type_manager = \Drupal::entityTypeManager();
     $file_system = \Drupal::service('file_system');
-    $scan = scandir($folder);
-    $candidates = array_diff($scan, ['.', '..', '__MACOSX']);
-    if (count($candidates) === 1) {
-      $subdir = reset($candidates);
-      if (is_dir($folder . '/' . $subdir)) {
-        $folder .= '/' . $subdir;
-      }
-    }
+    $folder = self::resolveArchiveRoot($folder, $entity_type_manager);
 
     $content_root = $folder;
     if (is_dir($folder . '/content')) {
