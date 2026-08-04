@@ -6,6 +6,7 @@ use Drupal\Component\Plugin\Derivative\DeriverBase;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Plugin\Discovery\ContainerDeriverInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
+use Drupal\default_content_ui\Traits\LocalExportEligibilityTrait;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -14,6 +15,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class ExportActionDeriver extends DeriverBase implements ContainerDeriverInterface {
 
   use StringTranslationTrait;
+  use LocalExportEligibilityTrait;
 
   /**
    * The entity type manager.
@@ -43,7 +45,7 @@ class ExportActionDeriver extends DeriverBase implements ContainerDeriverInterfa
    */
   public function getDerivativeDefinitions($base_plugin_definition) {
     foreach ($this->entityTypeManager->getDefinitions() as $entity_type_id => $entity_type) {
-      if ($entity_type->getGroup() === 'content') {
+      if ($this->isEligibleForLocalExport($entity_type)) {
         $this->derivatives[$entity_type_id] = $base_plugin_definition;
         $this->derivatives[$entity_type_id]['type'] = $entity_type_id;
         $this->derivatives[$entity_type_id]['label'] = $this->t('Export @type content', ['@type' => $entity_type->getLabel()]);

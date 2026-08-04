@@ -8,6 +8,7 @@ use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\Messenger\MessengerTrait;
+use Drupal\Core\Plugin\CachedDiscoveryClearerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StreamWrapper\StreamWrapperManagerInterface;
@@ -68,6 +69,13 @@ class DefaultContentUiHooks {
   protected EntityTypeManagerInterface $entityTypeManager;
 
   /**
+   * The plugin cache clearer.
+   *
+   * @var \Drupal\Core\Plugin\CachedDiscoveryClearerInterface
+   */
+  protected CachedDiscoveryClearerInterface $pluginCacheClearer;
+
+  /**
    * Constructs a new DefaultContentUiHooks object.
    */
   public function __construct(
@@ -77,6 +85,7 @@ class DefaultContentUiHooks {
     RequestStack $request_stack,
     FileSystemInterface $file_system,
     EntityTypeManagerInterface $entity_type_manager,
+    CachedDiscoveryClearerInterface $plugin_cache_clearer,
   ) {
     $this->streamWrapperManager = $stream_wrapper_manager;
     $this->currentUser = $current_user;
@@ -84,6 +93,7 @@ class DefaultContentUiHooks {
     $this->requestStack = $request_stack;
     $this->fileSystem = $file_system;
     $this->entityTypeManager = $entity_type_manager;
+    $this->pluginCacheClearer = $plugin_cache_clearer;
   }
 
   /**
@@ -236,6 +246,21 @@ class DefaultContentUiHooks {
 
         return ['#markup' => $output];
     }
+  }
+
+  /**
+   * Implements hook_modules_installed().
+   *
+   * The per-entity-type "Export" bulk action isn't cache-invalidated when
+   * a new entity type is added, so without this it can stay missing until
+   * an unrelated manual cache rebuild.
+   */
+  #[Hook('modules_installed')]
+  public function modulesInstalled($modules, $is_syncing) {
+    if ($is_syncing) {
+      return;
+    }
+    $this->pluginCacheClearer->clearCachedDefinitions();
   }
 
 }
