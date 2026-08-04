@@ -3,6 +3,7 @@
 namespace Drupal\default_content_ui\Batch;
 
 use Drupal\Core\DefaultContent\Exporter;
+use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 
@@ -174,7 +175,7 @@ class ExportBatch {
 
       $destination = 'temporary://' . $archive_name;
 
-      $file_system->move($zip_path, $destination, FileSystemInterface::EXISTS_REPLACE);
+      $file_system->move($zip_path, $destination, FileExists::Replace);
 
       $context['results']['download_archive'] = $archive_name;
     }

@@ -2,6 +2,7 @@
 
 namespace Drupal\default_content_ui\Form;
 
+use Drupal\Component\Plugin\Discovery\CachedDiscoveryInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -152,7 +153,12 @@ class SettingsForm extends ConfigFormBase {
       ->set('local_export_reference_mode', $reference_mode)
       ->save();
 
-    $this->localTaskManager->clearCachedDefinitions();
+    // LocalTaskManagerInterface doesn't itself guarantee this method, but
+    // core's LocalTaskManager (the only real implementation) provides it
+    // via CachedDiscoveryInterface.
+    if ($this->localTaskManager instanceof CachedDiscoveryInterface) {
+      $this->localTaskManager->clearCachedDefinitions();
+    }
 
     parent::submitForm($form, $form_state);
   }

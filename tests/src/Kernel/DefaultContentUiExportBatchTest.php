@@ -2,6 +2,7 @@
 
 namespace Drupal\Tests\default_content_ui\Kernel;
 
+use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\default_content_ui\Batch\ExportBatch;
@@ -97,7 +98,7 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
    */
   public function testPageAttachmentsShowsCountMessage() {
     $filename = 'default_content_export_test_count.zip';
-    \Drupal::service('file_system')->saveData('', 'temporary://' . $filename, FileSystemInterface::EXISTS_REPLACE);
+    \Drupal::service('file_system')->saveData('', 'temporary://' . $filename, FileExists::Replace);
 
     ExportBatch::finished(TRUE, ['download_archive' => $filename, 'count' => 2], []);
 
@@ -117,7 +118,7 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
    */
   public function testPageAttachmentsShowsSingleLabelMessage() {
     $filename = 'default_content_export_test_label.zip';
-    \Drupal::service('file_system')->saveData('', 'temporary://' . $filename, FileSystemInterface::EXISTS_REPLACE);
+    \Drupal::service('file_system')->saveData('', 'temporary://' . $filename, FileExists::Replace);
 
     ExportBatch::finished(TRUE, [
       'download_archive' => $filename,
@@ -208,7 +209,7 @@ class DefaultContentUiExportBatchTest extends KernelTestBase {
     $node->save();
 
     $blocked_folder = 'temporary://dcu_test_blocked_dir';
-    \Drupal::service('file_system')->saveData('not a directory', $blocked_folder, FileSystemInterface::EXISTS_REPLACE);
+    \Drupal::service('file_system')->saveData('not a directory', $blocked_folder, FileExists::Replace);
 
     $context = [];
     ExportBatch::export('node', $blocked_folder, 'entity', $context);

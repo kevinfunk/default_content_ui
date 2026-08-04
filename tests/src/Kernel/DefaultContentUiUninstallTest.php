@@ -2,6 +2,7 @@
 
 namespace Drupal\Tests\default_content_ui\Kernel;
 
+use Drupal\Core\File\FileExists;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\KernelTests\KernelTestBase;
 
@@ -29,14 +30,14 @@ class DefaultContentUiUninstallTest extends KernelTestBase {
     $file_system = \Drupal::service('file_system');
 
     $own_zip = 'temporary://default_content_export_' . $this->randomMachineName() . '.zip';
-    $file_system->saveData('fake zip contents', $own_zip, FileSystemInterface::EXISTS_REPLACE);
+    $file_system->saveData('fake zip contents', $own_zip, FileExists::Replace);
 
     $own_folder = 'temporary://default_content_export_' . $this->randomMachineName();
     $file_system->prepareDirectory($own_folder, FileSystemInterface::CREATE_DIRECTORY);
-    $file_system->saveData('leftover', $own_folder . '/leftover.yml', FileSystemInterface::EXISTS_REPLACE);
+    $file_system->saveData('leftover', $own_folder . '/leftover.yml', FileExists::Replace);
 
     $unrelated_file = 'temporary://' . $this->randomMachineName() . '.txt';
-    $file_system->saveData('not ours', $unrelated_file, FileSystemInterface::EXISTS_REPLACE);
+    $file_system->saveData('not ours', $unrelated_file, FileExists::Replace);
 
     \Drupal::moduleHandler()->loadInclude('default_content_ui', 'install');
     default_content_ui_uninstall();

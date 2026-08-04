@@ -153,6 +153,7 @@ class DefaultContentSubscriberTest extends KernelTestBase {
     $storage = \Drupal::entityTypeManager()->getStorage('entity_test_composite');
     $storage->resetCache([$referenced->id()]);
     $referenced = $storage->load($referenced->id());
+    $this->assertInstanceOf(EntityTestCompositeRelationship::class, $referenced);
     $this->assertEquals($node->id(), $referenced->get('parent_id')->value);
     $this->assertSame('node', $referenced->get('parent_type')->value);
 

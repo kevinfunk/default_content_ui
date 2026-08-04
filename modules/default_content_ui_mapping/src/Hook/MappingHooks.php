@@ -103,7 +103,7 @@ class MappingHooks implements ContainerInjectionInterface {
     $changed = FALSE;
 
     if ($strip_translations) {
-      $changed = $this->stripTranslations($data, $fallback_langcode) || $changed;
+      $changed = $this->stripTranslations($data, $fallback_langcode);
     }
 
     $changed = $this->applyRules($data, $mappings, $exclusion_rules, $value_exclusions) || $changed;
@@ -219,7 +219,7 @@ class MappingHooks implements ContainerInjectionInterface {
     $changed = FALSE;
 
     if (isset($data['default']) && is_array($data['default'])) {
-      $changed = $this->applyRulesToTranslation($data['default'], $entity_type, $bundle, $mappings, $exclusion_rules, $value_exclusions) || $changed;
+      $changed = $this->applyRulesToTranslation($data['default'], $entity_type, $bundle, $mappings, $exclusion_rules, $value_exclusions);
     }
 
     if (isset($data['translations']) && is_array($data['translations'])) {

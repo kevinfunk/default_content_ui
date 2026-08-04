@@ -2,6 +2,7 @@
 
 namespace Drupal\default_content_ui\Hook;
 
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\File\FileSystemInterface;
@@ -174,10 +175,14 @@ class DefaultContentUiHooks {
    * Implements hook_entity_operation().
    */
   #[Hook('entity_operation')]
-  public function entityOperation($entity) {
+  public function entityOperation($entity, CacheableMetadata $cacheability) {
     $operations = [];
     $entity_type = $entity->getEntityType();
-    $enabled_types = $this->configFactory->get('default_content_ui.settings')->get('local_export_types');
+    $config = $this->configFactory->get('default_content_ui.settings');
+    $cacheability->addCacheableDependency($config);
+    $cacheability->addCacheContexts(['user.permissions']);
+
+    $enabled_types = $config->get('local_export_types');
     $is_enabled = is_null($enabled_types) || in_array($entity->getEntityTypeId(), $enabled_types);
 
     if (!$is_enabled) {
@@ -185,7 +190,9 @@ class DefaultContentUiHooks {
     }
 
     if ($this->isEligibleForLocalExport($entity_type)) {
-      if ($this->currentUser->hasPermission('default content export') && $entity->access('view')) {
+      $access = $entity->access('view', NULL, TRUE);
+      $cacheability->addCacheableDependency($access);
+      if ($this->currentUser->hasPermission('default content export') && $access->isAllowed()) {
         $operations['default_content_export'] = [
           'title' => $this->t('Export'),
           'weight' => 100,
