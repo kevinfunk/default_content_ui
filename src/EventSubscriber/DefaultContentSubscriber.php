@@ -7,6 +7,7 @@ use Drupal\Core\DefaultContent\PreExportEvent;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FieldTypePluginManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -37,6 +38,7 @@ class DefaultContentSubscriber implements EventSubscriberInterface {
 
   public function __construct(
     protected FieldTypePluginManagerInterface $fieldTypePluginManager,
+    protected LoggerInterface $logger,
   ) {}
 
   /**
@@ -139,7 +141,7 @@ class DefaultContentSubscriber implements EventSubscriberInterface {
   protected function exportEntityReferenceRevisionsItem(FieldItemInterface $item, ExportMetadata $metadata): ?array {
     $entity = $item->get('entity')->getValue();
     if ($entity === NULL) {
-      \Drupal::logger('default_content_ui')->warning('Failed to export a reference on field @field of @entity_type %label because the referenced entity no longer exists.', [
+      $this->logger->warning('Failed to export a reference on field @field of @entity_type %label because the referenced entity no longer exists.', [
         '@field' => $item->getFieldDefinition()->getLabel(),
         '@entity_type' => $item->getEntity()->getEntityTypeId(),
         '%label' => $item->getEntity()->label(),

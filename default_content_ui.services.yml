@@ -1,4 +1,8 @@
 services:
+  logger.channel.default_content_ui:
+    parent: logger.channel_base
+    arguments: ['default_content_ui']
+
   default_content_ui.route_subscriber:
     class: Drupal\default_content_ui\Routing\ExportEntityRouteSubscriber
     arguments: ['@entity_type.manager']
@@ -17,6 +21,8 @@ services:
 
   default_content_ui.subscriber:
     class: Drupal\default_content_ui\EventSubscriber\DefaultContentSubscriber
-    arguments: ['@plugin.manager.field.field_type']
+    arguments:
+      - '@plugin.manager.field.field_type'
+      - '@logger.channel.default_content_ui'
     tags:
       - { name: event_subscriber }

@@ -9,6 +9,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\default_content_ui\Batch\ExportBatch;
 use Drupal\default_content_ui\Traits\ExportBatchSkeletonTrait;
@@ -43,12 +44,20 @@ class ExportContentAction extends ActionBase implements ContainerFactoryPluginIn
   protected $fileSystem;
 
   /**
+   * The current user.
+   *
+   * @var \Drupal\Core\Session\AccountProxyInterface
+   */
+  protected $currentUser;
+
+  /**
    * Constructs a new ExportContentAction object.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, ConfigFactoryInterface $config_factory, FileSystemInterface $file_system) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, ConfigFactoryInterface $config_factory, FileSystemInterface $file_system, AccountProxyInterface $current_user) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
     $this->configFactory = $config_factory;
     $this->fileSystem = $file_system;
+    $this->currentUser = $current_user;
   }
 
   /**
@@ -60,7 +69,8 @@ class ExportContentAction extends ActionBase implements ContainerFactoryPluginIn
       $plugin_id,
       $plugin_definition,
       $container->get('config.factory'),
-      $container->get('file_system')
+      $container->get('file_system'),
+      $container->get('current_user')
     );
   }
 
@@ -69,7 +79,7 @@ class ExportContentAction extends ActionBase implements ContainerFactoryPluginIn
    */
   public function access($object, ?AccountInterface $account = NULL, $return_as_object = FALSE) {
     if (!$account) {
-      $account = \Drupal::currentUser();
+      $account = $this->currentUser;
     }
 
     if ($object === NULL) {
