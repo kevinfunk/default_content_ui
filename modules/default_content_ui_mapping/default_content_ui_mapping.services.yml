@@ -1,0 +1,8 @@
+services:
+  default_content_ui_mapping.subscriber:
+    class: Drupal\default_content_ui_mapping\EventSubscriber\MappingSubscriber
+    arguments:
+      - '@config.factory'
+      - '@logger.factory'
+    tags:
+      - { name: event_subscriber }

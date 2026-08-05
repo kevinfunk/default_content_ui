@@ -8,9 +8,9 @@ use Drupal\Tests\BrowserTestBase;
  * Tests the Default Content UI Mapping settings form.
  *
  * MappingSettingsForm had no test coverage at all — only the underlying
- * MappingHooks logic was tested against hand-built config arrays, never
- * the admin form's own build/validate/submit cycle that produces that
- * config in the first place.
+ * MappingSubscriber logic was tested against hand-built config arrays,
+ * never the admin form's own build/validate/submit cycle that produces
+ * that config in the first place.
  *
  * @group default_content_ui
  */

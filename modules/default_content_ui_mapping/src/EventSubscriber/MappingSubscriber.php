@@ -1,53 +1,35 @@
 <?php
 
-namespace Drupal\default_content_ui_mapping\Hook;
+namespace Drupal\default_content_ui_mapping\EventSubscriber;
 
-use Drupal\Component\Serialization\Exception\InvalidDataTypeException;
-use Drupal\Component\Serialization\Yaml;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
-use Drupal\Core\File\FileSystemInterface;
-use Drupal\Core\Hook\Attribute\Hook;
+use Drupal\Core\DefaultContent\PreEntityImportEvent;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Hook implementations for Default Content UI Mapping.
+ * Applies field mappings, exclusions, and translation stripping on import.
  */
-class MappingHooks implements ContainerInjectionInterface {
+class MappingSubscriber implements EventSubscriberInterface {
 
-  /**
-   * Constructs a new MappingHooks object.
-   *
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
-   *   The config factory.
-   * @param \Drupal\Core\File\FileSystemInterface $fileSystem
-   *   The file system service.
-   * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $loggerFactory
-   *   The logger channel factory.
-   */
   public function __construct(
     protected ConfigFactoryInterface $configFactory,
-    protected FileSystemInterface $fileSystem,
     protected LoggerChannelFactoryInterface $loggerFactory,
   ) {}
 
   /**
    * {@inheritdoc}
    */
-  public static function create(ContainerInterface $container) {
-    return new static(
-      $container->get('config.factory'),
-      $container->get('file_system'),
-      $container->get('logger.factory')
-    );
+  public static function getSubscribedEvents(): array {
+    return [
+      PreEntityImportEvent::class => 'onPreEntityImport',
+    ];
   }
 
   /**
-   * Implements hook_default_content_ui_pre_import().
+   * Reacts before an entity is created during default content import.
    */
-  #[Hook('default_content_ui_pre_import')]
-  public function preImport(string $folder): void {
+  public function onPreEntityImport(PreEntityImportEvent $event): void {
     $config = $this->configFactory->get('default_content_ui_mapping.settings');
 
     $mappings = array_column($config->get('mappings') ?? [], 'target', 'source');
@@ -60,57 +42,13 @@ class MappingHooks implements ContainerInjectionInterface {
       return;
     }
 
-    $content_root = is_dir($folder . '/content') ? $folder . '/content' : $folder;
-    $files = $this->fileSystem->scanDirectory($content_root, '/\.yml$/');
-
-    foreach ($files as $file) {
-      $this->processFile($file->uri, $mappings, $exclusion_rules, $value_exclusions, $strip_translations, $config->get('fallback_langcode') ?: 'default');
-    }
-  }
-
-  /**
-   * Processes a single YAML file and applies configured rules.
-   *
-   * @param string $uri
-   *   The file URI.
-   * @param array $mappings
-   *   The field mapping rules.
-   * @param array $exclusion_rules
-   *   The field exclusion rules.
-   * @param array $value_exclusions
-   *   The value exclusion rules.
-   * @param bool $strip_translations
-   *   Whether to strip non-fallback translations.
-   * @param string $fallback_langcode
-   *   The primary language code to retain.
-   */
-  protected function processFile(string $uri, array $mappings, array $exclusion_rules, array $value_exclusions, bool $strip_translations, string $fallback_langcode): void {
-    try {
-      $data = Yaml::decode(file_get_contents($uri));
-    }
-    catch (InvalidDataTypeException $e) {
-      $this->loggerFactory->get('default_content_ui_mapping')->error(
-        'Failed to parse YAML file during mapping prep: @file. Error: @error',
-        ['@file' => $uri, '@error' => $e->getMessage()]
-      );
-      return;
-    }
-
-    if (!is_array($data)) {
-      return;
-    }
-
-    $changed = FALSE;
+    $fallback_langcode = $config->get('fallback_langcode') ?: 'default';
 
     if ($strip_translations) {
-      $changed = $this->stripTranslations($data, $fallback_langcode);
+      $this->stripTranslations($event->data, $fallback_langcode, $event->metadata['uuid'] ?? 'unknown');
     }
 
-    $changed = $this->applyRules($data, $mappings, $exclusion_rules, $value_exclusions) || $changed;
-
-    if ($changed) {
-      file_put_contents($uri, Yaml::encode($data));
-    }
+    $this->applyRules($event->data, $event->metadata, $mappings, $exclusion_rules, $value_exclusions);
   }
 
   /**
@@ -123,15 +61,13 @@ class MappingHooks implements ContainerInjectionInterface {
    * additional translation (if any) to keep from 'translations'.
    *
    * @param array $data
-   *   The parsed YAML data array.
+   *   The entity data (by reference).
    * @param string $fallback_langcode
    *   The langcode of the one additional translation to retain, if any.
-   *
-   * @return bool
-   *   TRUE if the data was modified, FALSE otherwise.
+   * @param string $uuid
+   *   The entity UUID, for logging.
    */
-  protected function stripTranslations(array &$data, string $fallback_langcode): bool {
-    $changed = FALSE;
+  protected function stripTranslations(array &$data, string $fallback_langcode, string $uuid): void {
     $stripped_langs = [];
 
     if (isset($data['translations']) && is_array($data['translations'])) {
@@ -139,7 +75,6 @@ class MappingHooks implements ContainerInjectionInterface {
         if ($langcode !== $fallback_langcode) {
           $stripped_langs[] = $langcode;
           unset($data['translations'][$langcode]);
-          $changed = TRUE;
         }
       }
       if (empty($data['translations'])) {
@@ -148,25 +83,22 @@ class MappingHooks implements ContainerInjectionInterface {
     }
 
     if (isset($data['default']) && is_array($data['default'])) {
-      $changed = $this->stripTranslationMetaFields($data['default']) || $changed;
+      $this->stripTranslationMetaFields($data['default']);
     }
     if (isset($data['translations']) && is_array($data['translations'])) {
       foreach ($data['translations'] as &$translation_data) {
         if (is_array($translation_data)) {
-          $changed = $this->stripTranslationMetaFields($translation_data) || $changed;
+          $this->stripTranslationMetaFields($translation_data);
         }
       }
     }
 
     if (!empty($stripped_langs)) {
-      $uuid = $data['_meta']['uuid'] ?? 'unknown';
       $this->loggerFactory->get('default_content_ui_mapping')->notice(
         'Stripped translations (@langs) from entity UUID: @uuid.',
         ['@langs' => implode(', ', $stripped_langs), '@uuid' => $uuid]
       );
     }
-
-    return $changed;
   }
 
   /**
@@ -174,19 +106,11 @@ class MappingHooks implements ContainerInjectionInterface {
    *
    * @param array $translation_data
    *   A single translation's field-values array (by reference).
-   *
-   * @return bool
-   *   TRUE if the data was modified, FALSE otherwise.
    */
-  protected function stripTranslationMetaFields(array &$translation_data): bool {
-    $changed = FALSE;
+  protected function stripTranslationMetaFields(array &$translation_data): void {
     foreach (['content_translation_source', 'content_translation_outdated'] as $meta_field) {
-      if (isset($translation_data[$meta_field])) {
-        unset($translation_data[$meta_field]);
-        $changed = TRUE;
-      }
+      unset($translation_data[$meta_field]);
     }
-    return $changed;
   }
 
   /**
@@ -198,39 +122,35 @@ class MappingHooks implements ContainerInjectionInterface {
    * YAML shape.
    *
    * @param array $data
-   *   The parsed YAML data array.
+   *   The entity data (by reference).
+   * @param array $metadata
+   *   The entity metadata (entity_type, bundle, etc.).
    * @param array $mappings
    *   The field mapping rules.
    * @param array $exclusion_rules
    *   The field exclusion rules.
    * @param array $value_exclusions
    *   The value exclusion rules.
-   *
-   * @return bool
-   *   TRUE if the data was modified, FALSE otherwise.
    */
-  protected function applyRules(array &$data, array $mappings, array $exclusion_rules, array $value_exclusions): bool {
+  protected function applyRules(array &$data, array $metadata, array $mappings, array $exclusion_rules, array $value_exclusions): void {
     if (empty($mappings) && empty($exclusion_rules) && empty($value_exclusions)) {
-      return FALSE;
+      return;
     }
 
-    $entity_type = $data['_meta']['entity_type'] ?? '';
-    $bundle = $data['_meta']['bundle'] ?? $entity_type;
-    $changed = FALSE;
+    $entity_type = $metadata['entity_type'] ?? '';
+    $bundle = $metadata['bundle'] ?? $entity_type;
 
     if (isset($data['default']) && is_array($data['default'])) {
-      $changed = $this->applyRulesToTranslation($data['default'], $entity_type, $bundle, $mappings, $exclusion_rules, $value_exclusions);
+      $this->applyRulesToTranslation($data['default'], $entity_type, $bundle, $mappings, $exclusion_rules, $value_exclusions);
     }
 
     if (isset($data['translations']) && is_array($data['translations'])) {
       foreach ($data['translations'] as &$translation_data) {
         if (is_array($translation_data)) {
-          $changed = $this->applyRulesToTranslation($translation_data, $entity_type, $bundle, $mappings, $exclusion_rules, $value_exclusions) || $changed;
+          $this->applyRulesToTranslation($translation_data, $entity_type, $bundle, $mappings, $exclusion_rules, $value_exclusions);
         }
       }
     }
-
-    return $changed;
   }
 
   /**
@@ -248,13 +168,8 @@ class MappingHooks implements ContainerInjectionInterface {
    *   The field exclusion rules.
    * @param array $value_exclusions
    *   The value exclusion rules.
-   *
-   * @return bool
-   *   TRUE if the data was modified, FALSE otherwise.
    */
-  protected function applyRulesToTranslation(array &$translation_data, string $entity_type, string $bundle, array $mappings, array $exclusion_rules, array $value_exclusions): bool {
-    $changed = FALSE;
-
+  protected function applyRulesToTranslation(array &$translation_data, string $entity_type, string $bundle, array $mappings, array $exclusion_rules, array $value_exclusions): void {
     foreach ($exclusion_rules as $rule) {
       if (!empty($rule['entity_type']) && $rule['entity_type'] !== $entity_type) {
         continue;
@@ -262,12 +177,7 @@ class MappingHooks implements ContainerInjectionInterface {
       if (!empty($rule['bundle']) && $rule['bundle'] !== $bundle) {
         continue;
       }
-
-      $field = $rule['field_name'];
-      if (array_key_exists($field, $translation_data)) {
-        unset($translation_data[$field]);
-        $changed = TRUE;
-      }
+      unset($translation_data[$rule['field_name']]);
     }
 
     foreach ($value_exclusions as $rule) {
@@ -289,7 +199,6 @@ class MappingHooks implements ContainerInjectionInterface {
           if (isset($item[$property]) && (string) $item[$property] === (string) $target_value) {
             unset($translation_data[$field][$index]);
             $field_changed = TRUE;
-            $changed = TRUE;
           }
         }
 
@@ -303,11 +212,8 @@ class MappingHooks implements ContainerInjectionInterface {
       if (array_key_exists($source, $translation_data)) {
         $translation_data[$target] = $translation_data[$source];
         unset($translation_data[$source]);
-        $changed = TRUE;
       }
     }
-
-    return $changed;
   }
 
 }

@@ -2,7 +2,7 @@
 
 An extension for the **Default Content UI** module that allows site administrators to map, filter, and clean up exported YAML content on the fly during the import process. 
 
-When migrating content between different Drupal sites using the core Default Content API, field architectures often don't match perfectly. This module intercepts the temporary ZIP archive during import and safely rewrites the YAML files before Drupal attempts to process them, preventing schema errors and data loss.
+When migrating content between different Drupal sites using the core Default Content API, field architectures often don't match perfectly. This module subscribes to core's `PreEntityImportEvent`, applying your translation, exclusion, and mapping rules to each entity's data in memory as it is imported, preventing schema errors and data loss.
 
 ## Features
 
@@ -58,7 +58,7 @@ To rename a field during import:
 ## Running the Import
 Once your rules are saved, simply navigate to the **Import** tab (`/admin/config/development/default-content/import`) and upload your ZIP archive.
 
-The module will automatically extract the archive, apply your translation, exclusion, and mapping rules to the raw YAML files, and then pass the cleaned data to Drupal core's Importer service.
+The module automatically applies your translation, exclusion, and mapping rules to each entity's data as Drupal core's Importer service processes it, with no rewriting of the archive's YAML/JSON files.
 
 ## Troubleshooting
-If an import behaves unexpectedly, check **Reports > Recent log messages** (`/admin/reports/dblog`). The module logs notices when translations are stripped (including the affected Entity UUIDs) and logs errors if a corrupted YAML file is encountered in the uploaded archive.
+If an import behaves unexpectedly, check **Reports > Recent log messages** (`/admin/reports/dblog`). The module logs notices when translations are stripped, including the affected Entity UUIDs.
