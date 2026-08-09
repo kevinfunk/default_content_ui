@@ -90,6 +90,26 @@ class ImportForm extends FormBase {
     $zip_uri = $file->getFileUri();
     $extract_path = 'temporary://import_extract_' . uniqid('', TRUE);
 
+    if ($this->configFactory()->get('default_content_ui.settings')->get('skip_import_dry_run')) {
+      $batch = [
+        'title' => $this->t('Importing Content'),
+        'operations' => [
+          [
+            [ImportBatch::class, 'extract'],
+            [$zip_uri, $extract_path, $fid],
+          ],
+          [
+            [ImportBatch::class, 'import'],
+            [$extract_path],
+          ],
+        ],
+        'finished' => [ImportBatch::class, 'finished'],
+      ];
+
+      batch_set($batch);
+      return;
+    }
+
     $batch = [
       'title' => $this->t('Importing Content'),
       'operations' => [
@@ -98,14 +118,15 @@ class ImportForm extends FormBase {
           [$zip_uri, $extract_path, $fid],
         ],
         [
-          [ImportBatch::class, 'import'],
+          [ImportBatch::class, 'scanOrImport'],
           [$extract_path],
         ],
       ],
-      'finished' => [ImportBatch::class, 'finished'],
+      'finished' => [ImportBatch::class, 'finishedDryRun'],
     ];
 
     batch_set($batch);
+    $form_state->setRedirect('default_content_ui.import_confirm');
   }
 
 }

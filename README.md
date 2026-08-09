@@ -47,13 +47,17 @@ You can export a single entity (and its dependencies) in two ways:
 2.  Click the **Import** tab.
 3.  Upload a `.zip` file containing your YAML content.
     * *Note:* The archive structure should be `entity_type/uuid.yml`. The module automatically handles archives wrapped in a top-level folder.
-4.  Click **Import Content**.
+4.  Click **Import Content**. By default, the archive is first scanned for fields that don't exist on this site (e.g. it was exported from a site with a different field architecture):
+    * If nothing is found, the import proceeds immediately — there's no separate report to click through for a clean archive.
+    * If an issue is found, the import stops and shows a report naming the field. Since importing as-is is guaranteed to fail on that same field, there's no **Import Content** button in this case — instead, a link takes you to [Default Content UI Mapping](modules/default_content_ui_mapping)'s Field Mapping settings (if installed) to add a rename rule, or to enable that module (if not), before you **Cancel** and re-upload.
+    * The import itself is all-or-nothing: if any entity in the archive fails partway through (e.g. it references a taxonomy term, role, or other entity that doesn't exist on this site), everything imported earlier in that same batch is rolled back too, rather than leaving a half-imported archive behind — and any success message a module reported about work it did earlier in that same failed attempt is discarded along with it, so you won't see a stale "N items imported" next to the failure. This covers database-recorded content only — a physical file already copied alongside a file entity is not undone by a rollback.
 
 ## Configuration
 
 Navigate to **Configuration > Development > Default content > Settings** to configure:
 * Which entity types should display the "Export" tab and operation link.
 * Whether dependencies are included by default during single entity exports.
+* Whether uploading an archive shows the dry-run report before importing, or imports immediately in one step ("Skip the dry-run report").
 
 ## Compatibility Notes
 

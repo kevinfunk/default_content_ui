@@ -132,6 +132,19 @@ class SettingsForm extends ConfigFormBase {
       '#default_value' => $config->get('local_export_reference_mode') ?? TRUE,
     ];
 
+    $form['import'] = [
+      '#type' => 'details',
+      '#title' => $this->t('Import'),
+      '#open' => TRUE,
+    ];
+
+    $form['import']['skip_import_dry_run'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Skip the dry-run report'),
+      '#description' => $this->t('By default, uploading an archive first scans it for fields unknown to this site and shows a report before anything is imported. Enabling this imports immediately instead, in one step.'),
+      '#default_value' => (bool) $config->get('skip_import_dry_run'),
+    ];
+
     return parent::buildForm($form, $form_state);
   }
 
@@ -151,6 +164,7 @@ class SettingsForm extends ConfigFormBase {
     $this->config('default_content_ui.settings')
       ->set('local_export_types', $enabled_types)
       ->set('local_export_reference_mode', $reference_mode)
+      ->set('skip_import_dry_run', (bool) $form_state->getValue('skip_import_dry_run'))
       ->save();
 
     // LocalTaskManagerInterface doesn't itself guarantee this method, but

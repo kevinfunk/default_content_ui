@@ -1,0 +1,7 @@
+name: 'Default Content UI Pre-Import Test Helper'
+type: module
+description: 'Records invocations of hook_default_content_ui_pre_import() for testing.'
+package: Testing
+core_version_requirement: ^11.3
+dependencies:
+  - default_content_ui:default_content_ui

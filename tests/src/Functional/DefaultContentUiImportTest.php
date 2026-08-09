@@ -37,6 +37,14 @@ class DefaultContentUiImportTest extends BrowserTestBase {
   protected function setUp(): void {
     parent::setUp();
     $this->drupalCreateContentType(['type' => 'page', 'name' => 'Basic page']);
+
+    // These tests exercise import behavior (skip-vs-overwrite, malformed
+    // YAML, archive size limits), not the dry-run confirmation step added
+    // separately — importing in one step, as before, keeps that the case.
+    // See DefaultContentUiImportDryRunTest for the confirmation step itself.
+    \Drupal::configFactory()->getEditable('default_content_ui.settings')
+      ->set('skip_import_dry_run', TRUE)
+      ->save();
   }
 
   /**

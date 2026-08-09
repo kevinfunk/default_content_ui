@@ -20,6 +20,9 @@ default_content_ui.settings:
     local_export_reference_mode:
       type: boolean
       label: 'Local Export: Include Dependencies'
+    skip_import_dry_run:
+      type: boolean
+      label: 'Import: Skip Dry-Run Report'
 
 action.configuration.default_content_ui_export_action:*:
   type: action_configuration_default

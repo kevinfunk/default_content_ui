@@ -22,6 +22,14 @@ default_content_ui.import:
   requirements:
     _permission: 'default content import'
 
+default_content_ui.import_confirm:
+  path: '/admin/config/development/default-content/import/confirm'
+  defaults:
+    _form: '\Drupal\default_content_ui\Form\ImportConfirmForm'
+    _title: 'Review Import'
+  requirements:
+    _permission: 'default content import'
+
 default_content_ui.export_bulk:
   path: '/admin/config/development/default-content/export'
   defaults:
