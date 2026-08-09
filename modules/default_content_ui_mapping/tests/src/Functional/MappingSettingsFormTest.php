@@ -91,4 +91,22 @@ class MappingSettingsFormTest extends BrowserTestBase {
     $this->assertSame([], $this->config('default_content_ui_mapping.settings')->get('mappings') ?? []);
   }
 
+  /**
+   * Tests that the unsaved-changes warning library is attached to the form.
+   *
+   * The library itself relies on native browser behavior (beforeunload)
+   * that isn't practical to exercise here — this only guards against the
+   * library or its marker class silently falling off the form in a
+   * future refactor.
+   */
+  public function testUnsavedChangesLibraryIsAttached() {
+    $admin_user = $this->drupalCreateUser(['administer site configuration']);
+    $this->drupalLogin($admin_user);
+
+    $this->drupalGet('/admin/config/development/default-content/mapping');
+
+    $this->assertSession()->elementExists('css', 'form.dcu-mapping-settings-form');
+    $this->assertSession()->responseContains('default_content_ui_mapping/js/unsaved-changes.js');
+  }
+
 }

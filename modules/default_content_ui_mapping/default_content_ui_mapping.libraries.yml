@@ -1,0 +1,8 @@
+unsaved_changes:
+  version: 1.x
+  js:
+    js/unsaved-changes.js: {}
+  dependencies:
+    - core/drupal
+    - core/once
+    - core/drupal.message

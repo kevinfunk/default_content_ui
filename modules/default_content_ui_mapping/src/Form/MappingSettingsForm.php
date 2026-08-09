@@ -57,6 +57,8 @@ class MappingSettingsForm extends ConfigFormBase {
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('default_content_ui_mapping.settings');
     $form['#tree'] = TRUE;
+    $form['#attributes']['class'][] = 'dcu-mapping-settings-form';
+    $form['#attached']['library'][] = 'default_content_ui_mapping/unsaved_changes';
     $user_input = $form_state->getUserInput();
 
     $form['translation_handling'] = $this->buildTranslationHandlingForm($config);
