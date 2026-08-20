@@ -3,6 +3,11 @@
     "description": "Provides a Default content user interface for importing and exporting content.",
     "type": "drupal-module",
     "license": "GPL-2.0-or-later",
+    "homepage": "https://github.com/kevinfunk/default_content_ui",
+    "support": {
+        "issues": "https://github.com/kevinfunk/default_content_ui/issues",
+        "source": "https://github.com/kevinfunk/default_content_ui.git"
+    },
     "minimum-stability": "dev",
     "prefer-stable": true,
     "authors": [
