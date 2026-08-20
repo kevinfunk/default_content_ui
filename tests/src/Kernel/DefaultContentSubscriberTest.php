@@ -28,7 +28,7 @@ class DefaultContentSubscriberTest extends KernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected $strictConfigSchema = FALSE;
+  protected $strictConfigSchema = TRUE;
 
   /**
    * {@inheritdoc}
